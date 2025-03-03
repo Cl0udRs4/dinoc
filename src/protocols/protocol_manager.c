@@ -27,7 +27,7 @@ static protocol_manager_t* global_manager = NULL;
  */
 status_t protocol_manager_init(void) {
     if (global_manager != NULL) {
-        return STATUS_ERROR_ALREADY_EXISTS;
+        return STATUS_ERROR_ALREADY_RUNNING;
     }
     
     global_manager = (protocol_manager_t*)malloc(sizeof(protocol_manager_t));

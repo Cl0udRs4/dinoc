@@ -14,6 +14,9 @@
 #include <pthread.h>
 #include <libwebsockets.h>
 
+// Heartbeat magic number
+#define HEARTBEAT_MAGIC 0x48454152  // "HEAR"
+
 // WebSocket listener context
 typedef struct {
     struct lws_context* context;     // libwebsockets context
@@ -98,18 +101,27 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason,
                     return -1;
                 }
                 
-                // Create client
-                client_t* client = (client_t*)malloc(sizeof(client_t));
-                if (client == NULL) {
+                // Create protocol context
+                void* protocol_context = malloc(sizeof(struct lws*));
+                if (protocol_context == NULL) {
                     return -1;
                 }
                 
-                // Initialize client
-                memset(client, 0, sizeof(client_t));
-                uuid_generate(&client->id);
-                client->connection_time = time(NULL);
-                client->last_seen_time = client->connection_time;
-                client->user_data = wsi;
+                // Set protocol context
+                struct lws** wsi_ptr = (struct lws**)protocol_context;
+                *wsi_ptr = wsi;
+                
+                // Register client
+                client_t* client = NULL;
+                status_t status = client_register((protocol_listener_t*)ctx, protocol_context, &client);
+                
+                if (status != STATUS_SUCCESS) {
+                    free(protocol_context);
+                    return -1;
+                }
+                
+                // Update client state
+                client_update_state(client, CLIENT_STATE_CONNECTED);
                 
                 // Get client IP address
                 char client_ip[128];
@@ -165,6 +177,9 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason,
                     break;
                 }
                 
+                // Update client state
+                client_update_state(session->client, CLIENT_STATE_DISCONNECTED);
+                
                 // Call client disconnected callback
                 if (ctx->on_client_disconnected != NULL) {
                     ctx->on_client_disconnected((protocol_listener_t*)ctx, session->client);
@@ -183,8 +198,12 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason,
                 
                 pthread_mutex_unlock(&ctx->clients_mutex);
                 
-                // Free client
-                free(session->client);
+                // Free protocol context
+                if (session->client->protocol_context != NULL) {
+                    free(session->client->protocol_context);
+                    session->client->protocol_context = NULL;
+                }
+                
                 session->client = NULL;
                 session->established = false;
                 
@@ -249,9 +268,22 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason,
                     message.data = session->rx_buffer;
                     message.data_len = session->rx_buffer_len;
                     
-                    // Call message received callback
-                    if (ctx->on_message_received != NULL) {
-                        ctx->on_message_received((protocol_listener_t*)ctx, session->client, &message);
+                    // Check if this is a heartbeat message
+                    if (message.data_len == sizeof(uint32_t) && 
+                        *((uint32_t*)message.data) == HEARTBEAT_MAGIC) {
+                        // Process heartbeat
+                        client_heartbeat(session->client);
+                        
+                        // Update client state if needed
+                        if (session->client->state == CLIENT_STATE_CONNECTED || 
+                            session->client->state == CLIENT_STATE_REGISTERED) {
+                            client_update_state(session->client, CLIENT_STATE_ACTIVE);
+                        }
+                    } else {
+                        // Call message received callback
+                        if (ctx->on_message_received != NULL) {
+                            ctx->on_message_received((protocol_listener_t*)ctx, session->client, &message);
+                        }
                     }
                     
                     // Reset receive buffer
@@ -495,8 +527,12 @@ static status_t ws_listener_send_message(protocol_listener_t* listener, client_t
         return STATUS_ERROR_NOT_RUNNING;
     }
     
-    // Get WebSocket connection
-    struct lws* wsi = (struct lws*)client->user_data;
+    // Get WebSocket connection from protocol context
+    if (client->protocol_context == NULL) {
+        return STATUS_ERROR_INVALID_PARAM;
+    }
+    
+    struct lws* wsi = *((struct lws**)client->protocol_context);
     if (wsi == NULL) {
         return STATUS_ERROR_INVALID_PARAM;
     }

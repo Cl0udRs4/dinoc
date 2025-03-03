@@ -18,6 +18,9 @@
 #include <time.h>
 #include <errno.h>
 
+// Heartbeat magic number
+#define HEARTBEAT_MAGIC 0x48454152  // "HEAR"
+
 // DNS protocol constants
 #define DNS_MAX_DOMAIN_LENGTH 253
 #define DNS_MAX_LABEL_LENGTH 63
@@ -139,9 +142,12 @@ static client_t* dns_find_client_by_address(dns_listener_ctx_t* ctx, const char*
     pthread_mutex_lock(&ctx->clients_mutex);
     
     for (size_t i = 0; i < ctx->client_count; i++) {
-        if (strcmp(ctx->clients[i]->address, address) == 0) {
-            client = ctx->clients[i];
-            break;
+        if (ctx->clients[i]->protocol_context != NULL) {
+            char* client_ip = (char*)ctx->clients[i]->protocol_context;
+            if (strcmp(client_ip, address) == 0) {
+                client = ctx->clients[i];
+                break;
+            }
         }
     }
     
@@ -158,18 +164,26 @@ static status_t dns_add_client(dns_listener_ctx_t* ctx, const char* address, cli
         return STATUS_ERROR_INVALID_PARAM;
     }
     
-    // Create client
-    client_t* new_client = (client_t*)malloc(sizeof(client_t));
-    if (new_client == NULL) {
+    // Create protocol context (IP address)
+    void* protocol_context = strdup(address);
+    if (protocol_context == NULL) {
         return STATUS_ERROR_MEMORY;
     }
     
-    // Initialize client
-    memset(new_client, 0, sizeof(client_t));
-    uuid_generate(&new_client->id);
-    new_client->connection_time = time(NULL);
-    new_client->last_seen_time = new_client->connection_time;
-    strncpy(new_client->address, address, sizeof(new_client->address) - 1);
+    // Register client
+    protocol_listener_t* listener = (protocol_listener_t*)ctx;
+    status_t status = client_register(listener, protocol_context, client);
+    
+    if (status != STATUS_SUCCESS) {
+        free(protocol_context);
+        return status;
+    }
+    
+    // Update client state
+    client_update_state(*client, CLIENT_STATE_CONNECTED);
+    
+    // Update client information
+    client_update_info(*client, NULL, address, NULL);
     
     // Add client to list
     pthread_mutex_lock(&ctx->clients_mutex);
@@ -181,7 +195,6 @@ static status_t dns_add_client(dns_listener_ctx_t* ctx, const char* address, cli
         
         if (new_clients == NULL) {
             pthread_mutex_unlock(&ctx->clients_mutex);
-            free(new_client);
             return STATUS_ERROR_MEMORY;
         }
         
@@ -189,10 +202,14 @@ static status_t dns_add_client(dns_listener_ctx_t* ctx, const char* address, cli
         ctx->client_capacity = new_capacity;
     }
     
-    ctx->clients[ctx->client_count++] = new_client;
+    ctx->clients[ctx->client_count++] = *client;
     pthread_mutex_unlock(&ctx->clients_mutex);
     
-    *client = new_client;
+    // Call client connected callback
+    if (ctx->on_client_connected != NULL) {
+        ctx->on_client_connected(listener, *client);
+    }
+    
     return STATUS_SUCCESS;
 }
 
@@ -461,6 +478,29 @@ static status_t dns_listener_stop(protocol_listener_t* listener) {
     ares_library_cleanup();
     */
     
+    // Update client states and free protocol contexts
+    pthread_mutex_lock(&ctx->clients_mutex);
+    
+    for (size_t i = 0; i < ctx->client_count; i++) {
+        client_t* client = ctx->clients[i];
+        
+        // Update client state
+        client_update_state(client, CLIENT_STATE_DISCONNECTED);
+        
+        // Call client disconnected callback
+        if (ctx->on_client_disconnected != NULL) {
+            ctx->on_client_disconnected(listener, client);
+        }
+        
+        // Free protocol context
+        if (client->protocol_context != NULL) {
+            free(client->protocol_context);
+            client->protocol_context = NULL;
+        }
+    }
+    
+    pthread_mutex_unlock(&ctx->clients_mutex);
+    
     return STATUS_SUCCESS;
 }
 
@@ -479,13 +519,8 @@ static status_t dns_listener_destroy(protocol_listener_t* listener) {
         dns_listener_stop(listener);
     }
     
-    // Free clients
+    // Free clients array (but not clients themselves, as they are managed by the client system)
     pthread_mutex_lock(&ctx->clients_mutex);
-    
-    for (size_t i = 0; i < ctx->client_count; i++) {
-        free(ctx->clients[i]);
-    }
-    
     free(ctx->clients);
     pthread_mutex_unlock(&ctx->clients_mutex);
     pthread_mutex_destroy(&ctx->clients_mutex);
