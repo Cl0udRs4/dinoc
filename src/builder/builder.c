@@ -32,6 +32,23 @@ static status_t parse_modules(const char* modules_str, char*** modules, size_t* 
 static status_t parse_encryption(const char* encryption_str, encryption_algorithm_t* algorithm);
 static void print_usage(const char* program_name);
 
+// Test helper functions
+status_t builder_parse_args_test_helper(const char* protocols_str, protocol_type_t** protocols, size_t* count) {
+    return parse_protocols(protocols_str, protocols, count);
+}
+
+status_t builder_parse_servers_test_helper(const char* servers_str, char*** servers, size_t* count) {
+    return parse_servers(servers_str, servers, count);
+}
+
+status_t builder_parse_modules_test_helper(const char* modules_str, char*** modules, size_t* count) {
+    return parse_modules(modules_str, modules, count);
+}
+
+status_t builder_parse_encryption_test_helper(const char* encryption_str, encryption_algorithm_t* algorithm) {
+    return parse_encryption(encryption_str, algorithm);
+}
+
 /**
  * @brief Initialize builder
  */

@@ -73,6 +73,7 @@ builder: $(BUILD_DIR) $(BIN_DIR)
 # Tests target
 tests:
 	$(MAKE) -C $(SRC_DIR)/tests
+	$(MAKE) -C $(SRC_DIR)/tests/builder
 
 # Clean target
 clean:
