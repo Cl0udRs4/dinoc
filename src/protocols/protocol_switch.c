@@ -136,11 +136,28 @@ status_t protocol_switch_process_message(client_t* client, const uint8_t* data, 
         return status;
     }
     
+    // Get callback functions from protocol manager
+    void (*on_message_received)(protocol_listener_t*, client_t*, protocol_message_t*) = NULL;
+    void (*on_client_connected)(protocol_listener_t*, client_t*) = NULL;
+    void (*on_client_disconnected)(protocol_listener_t*, client_t*) = NULL;
+    
+    // Get callbacks from protocol manager
+    status = protocol_manager_get_callbacks(client->listener, 
+                                          &on_message_received,
+                                          &on_client_connected,
+                                          &on_client_disconnected);
+    
+    if (status != STATUS_SUCCESS) {
+        LOG_ERROR("Failed to get callbacks from old protocol listener: %d", status);
+        protocol_manager_destroy_listener(new_listener);
+        return status;
+    }
+    
     // Register callbacks
     status = protocol_manager_register_callbacks(new_listener,
-                                               client->listener->on_message_received,
-                                               client->listener->on_client_connected,
-                                               client->listener->on_client_disconnected);
+                                               on_message_received,
+                                               on_client_connected,
+                                               on_client_disconnected);
     
     if (status != STATUS_SUCCESS) {
         LOG_ERROR("Failed to register callbacks for new protocol listener: %d", status);
