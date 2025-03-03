@@ -5,6 +5,7 @@
 
 #include "../include/task.h"
 #include "../include/client.h"
+#include "../common/uuid.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -115,7 +116,7 @@ status_t task_create(const uuid_t* client_id, task_type_t type,
     
     // Initialize task
     memset(new_task, 0, sizeof(task_t));
-    uuid_generate(&new_task->id);
+    uuid_generate_compat(&new_task->id);
     memcpy(&new_task->client_id, client_id, sizeof(uuid_t));
     new_task->type = type;
     new_task->state = TASK_STATE_CREATED;
@@ -302,7 +303,7 @@ task_t* task_find(const uuid_t* id) {
     pthread_mutex_lock(&global_manager->mutex);
     
     for (size_t i = 0; i < global_manager->task_count; i++) {
-        if (uuid_compare(id, &global_manager->tasks[i]->id) == 0) {
+        if (uuid_compare_wrapper(*id, global_manager->tasks[i]->id) == 0) {
             found_task = global_manager->tasks[i];
             break;
         }
@@ -327,7 +328,7 @@ status_t task_get_for_client(const uuid_t* client_id, task_t*** tasks, size_t* c
     pthread_mutex_lock(&global_manager->mutex);
     
     for (size_t i = 0; i < global_manager->task_count; i++) {
-        if (uuid_compare(client_id, &global_manager->tasks[i]->client_id) == 0) {
+        if (uuid_compare_wrapper(*client_id, global_manager->tasks[i]->client_id) == 0) {
             matching_count++;
         }
     }
@@ -349,7 +350,7 @@ status_t task_get_for_client(const uuid_t* client_id, task_t*** tasks, size_t* c
     // Fill array with matching tasks
     size_t index = 0;
     for (size_t i = 0; i < global_manager->task_count; i++) {
-        if (uuid_compare(client_id, &global_manager->tasks[i]->client_id) == 0) {
+        if (uuid_compare_wrapper(*client_id, global_manager->tasks[i]->client_id) == 0) {
             matching_tasks[index++] = global_manager->tasks[i];
         }
     }

@@ -3,7 +3,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -I./src/include
 LDFLAGS = -L./lib
-LDLIBS = -lpthread -luuid -lssl -lcrypto
+LDLIBS = -lpthread -luuid -lssl -lcrypto -lmicrohttpd -ljansson -lpcap -lwebsockets -lz -lreadline -lm
 
 # Directories
 SRC_DIR = src
@@ -21,7 +21,8 @@ SERVER_SRCS = $(wildcard $(SRC_DIR)/*.c) \
               $(wildcard $(SRC_DIR)/module/*.c) \
               $(wildcard $(SRC_DIR)/protocols/*.c) \
               $(wildcard $(SRC_DIR)/server/*.c) \
-              $(wildcard $(SRC_DIR)/task/*.c)
+              $(wildcard $(SRC_DIR)/task/*.c) \
+              $(SRC_DIR)/common/base64.c
 
 # Object files
 SERVER_OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SERVER_SRCS))

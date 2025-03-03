@@ -29,6 +29,8 @@ status_t protocol_manager_init(void) {
     if (global_manager != NULL) {
         return STATUS_ERROR_ALREADY_RUNNING;
     }
+    printf("Initializing protocol manager\n");
+    fflush(stdout);
     
     global_manager = (protocol_manager_t*)malloc(sizeof(protocol_manager_t));
     if (global_manager == NULL) {
@@ -46,6 +48,8 @@ status_t protocol_manager_init(void) {
     }
     
     pthread_mutex_init(&global_manager->mutex, NULL);
+    printf("Protocol manager initialized successfully\n");
+    fflush(stdout);
     
     return STATUS_SUCCESS;
 }
@@ -87,6 +91,8 @@ status_t protocol_manager_create_listener(protocol_type_t type, const protocol_l
     if (global_manager == NULL) {
         return STATUS_ERROR_NOT_FOUND;
     }
+    printf("Protocol manager creating listener of type %d\n", type);
+    fflush(stdout);
     
     if (config == NULL || listener == NULL) {
         return STATUS_ERROR_INVALID_PARAM;
@@ -120,6 +126,8 @@ status_t protocol_manager_create_listener(protocol_type_t type, const protocol_l
             return STATUS_ERROR_INVALID_PARAM;
     }
     
+    printf("Protocol listener creation status: %d\n", status);
+    fflush(stdout);
     if (status != STATUS_SUCCESS) {
         return status;
     }
@@ -207,6 +215,8 @@ status_t protocol_manager_start_listener(protocol_listener_t* listener) {
     
     if (listener == NULL) {
         return STATUS_ERROR_INVALID_PARAM;
+        fprintf(stderr, "Failed to start listener: invalid parameter\n");
+        fflush(stderr);
     }
     
     return listener->start(listener);

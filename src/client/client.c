@@ -3,14 +3,18 @@
  * @brief Client management implementation for C2 server
  */
 
+#define _GNU_SOURCE /* For strdup */
+
 #include "../include/client.h"
 #include "../include/protocol.h"
 #include "../protocols/protocol_switch.h"
+#include "../common/uuid.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <time.h>
+#include <sys/time.h>
 
 // Heartbeat magic number
 #define HEARTBEAT_MAGIC 0x48454152  // "HEAR"
@@ -92,7 +96,7 @@ status_t client_register(protocol_listener_t* listener, void* protocol_context, 
     memset(new_client, 0, sizeof(client_t));
     
     // Generate UUID
-    uuid_generate(new_client->id);
+    uuid_generate_wrapper(new_client->id);
     
     // Set initial state
     new_client->state = CLIENT_STATE_CONNECTED;
@@ -366,7 +370,7 @@ client_t* client_find(const uuid_t* id) {
     pthread_mutex_lock(&clients_mutex);
     
     for (size_t i = 0; i < clients_count; i++) {
-        if (uuid_compare(clients[i]->id, *id) == 0) {
+        if (uuid_compare_wrapper(clients[i]->id, *id) == 0) {
             pthread_mutex_unlock(&clients_mutex);
             return clients[i];
         }

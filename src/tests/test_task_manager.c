@@ -6,6 +6,7 @@
 #include "../include/task.h"
 #include "../include/common.h"
 #include "../include/client.h"
+#include "../common/uuid.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,7 +49,7 @@ static void test_task_lifecycle(void) {
     
     // Create client ID
     uuid_t client_id;
-    uuid_generate(&client_id);
+    uuid_generate_compat(&client_id);
     
     // Create task data
     const char* data_str = "echo \"hello world\"";
@@ -201,7 +202,7 @@ static void test_task_timeout(void) {
     
     // Create client ID
     uuid_t client_id;
-    uuid_generate(&client_id);
+    uuid_generate_compat(&client_id);
     
     // Create task data
     const char* data_str = "sleep 10";
@@ -261,7 +262,7 @@ static void test_task_error(void) {
     
     // Create client ID
     uuid_t client_id;
-    uuid_generate(&client_id);
+    uuid_generate_compat(&client_id);
     
     // Create task data
     const char* data_str = "invalid command";

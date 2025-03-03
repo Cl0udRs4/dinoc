@@ -1,0 +1,33 @@
+--- a/src/server/server.c
++++ b/src/server/server.c
+@@ -108,6 +108,8 @@ status_t server_start(void) {
+     pthread_mutex_lock(&server_mutex);
+     
+     if (server_running) {
++        printf("Server already running\n");
++        fflush(stdout);
+         pthread_mutex_unlock(&server_mutex);
+         return STATUS_ERROR_ALREADY_RUNNING;
+     }
+@@ -115,6 +117,8 @@ status_t server_start(void) {
+     // Create protocol listeners
+     status_t status;
+     protocol_listener_config_t listener_config;
++    printf("Starting server initialization\n");
++    fflush(stdout);
+     
+     // TCP listener
+     if (server_config.enable_tcp) {
+@@ -122,9 +126,11 @@ status_t server_start(void) {
+         listener_config.bind_address = server_config.bind_address;
+         listener_config.port = server_config.tcp_port;
+         
++        printf("Creating TCP listener on %s:%d\n", listener_config.bind_address, listener_config.port);
++        fflush(stdout);
+         status = protocol_manager_create_listener(PROTOCOL_TYPE_TCP, &listener_config, &tcp_listener);
+         if (status != STATUS_SUCCESS) {
+-            LOG_ERROR("Failed to create TCP listener: %d", status);
++            printf("Failed to create TCP listener: %d\n", status);
+             server_stop();
+             pthread_mutex_unlock(&server_mutex);
+             return status;

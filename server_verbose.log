@@ -1,0 +1,22 @@
+./bin/server: unrecognized option '--verbose'
+Usage: ./bin/server [options]
+Options:
+  -c, --config FILE       Configuration file path
+  -b, --bind ADDRESS      Bind address for listeners
+  -t, --tcp-port PORT     TCP port (default: 8080)
+  -u, --udp-port PORT     UDP port (default: 8081)
+  -w, --ws-port PORT      WebSocket port (default: 8082)
+  -d, --dns-port PORT     DNS port (default: 53)
+  -D, --dns-domain DOMAIN DNS domain
+  -p, --pcap-device DEV   PCAP device for ICMP (default: any)
+  -h, --http-port PORT    HTTP API port (default: 8083)
+  -l, --log-file FILE     Log file path
+  -L, --log-level LEVEL   Log level (0-5, default: 3)
+      --disable-tcp       Disable TCP listener
+      --disable-udp       Disable UDP listener
+      --disable-ws        Disable WebSocket listener
+      --disable-icmp      Disable ICMP listener
+      --disable-dns       Disable DNS listener
+      --disable-http-api  Disable HTTP API
+      --disable-console   Disable console interface
+  -?, --help              Show this help message

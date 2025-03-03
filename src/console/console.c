@@ -3,10 +3,13 @@
  * @brief Console interface implementation for C2 server
  */
 
+#define _GNU_SOURCE /* For strdup */
+
 #include "../include/console.h"
 #include "../include/client.h"
 #include "../include/task.h"
 #include "../include/protocol.h"
+#include "../common/uuid.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -444,12 +447,7 @@ static status_t console_cmd_clients(int argc, char** argv) {
             for (size_t i = 0; i < count; i++) {
                 char id_str[37];
                 // Convert UUID to string
-                snprintf(id_str, sizeof(id_str), "%08x-%04x-%04x-%04x-%012x",
-                         clients[i]->id.time_low,
-                         clients[i]->id.time_mid,
-                         clients[i]->id.time_hi_and_version,
-                         clients[i]->id.clock_seq,
-                         clients[i]->id.node);
+                uuid_to_string(clients[i]->id, id_str, sizeof(id_str));
                 
                 char state_str[20];
                 switch (clients[i]->state) {
@@ -474,7 +472,7 @@ static status_t console_cmd_clients(int argc, char** argv) {
                 }
                 
                 char last_seen_str[30];
-                struct tm* timeinfo = localtime(&clients[i]->last_seen);
+                struct tm* timeinfo = localtime(&clients[i]->last_seen_time);
                 strftime(last_seen_str, sizeof(last_seen_str), "%Y-%m-%d %H:%M:%S", timeinfo);
                 
                 printf("%-36s %-15s %-20s %-10s %-20s\n",
@@ -492,13 +490,7 @@ static status_t console_cmd_clients(int argc, char** argv) {
         // Show client details
         uuid_t id;
         // Parse UUID from string
-        // This is a simplified version, in a real implementation you would use a proper UUID parsing function
-        if (sscanf(argv[1], "%08x-%04x-%04x-%04x-%012x",
-                  &id.time_low,
-                  &id.time_mid,
-                  &id.time_hi_and_version,
-                  &id.clock_seq,
-                  &id.node) != 5) {
+        if (uuid_from_string(argv[1], id) != STATUS_SUCCESS) {
             fprintf(stderr, "Error: Invalid client ID format\n");
             return STATUS_ERROR_INVALID_PARAM;
         }
@@ -510,12 +502,9 @@ static status_t console_cmd_clients(int argc, char** argv) {
         }
         
         printf("Client Details:\n");
-        printf("ID: %08x-%04x-%04x-%04x-%012x\n",
-               client->id.time_low,
-               client->id.time_mid,
-               client->id.time_hi_and_version,
-               client->id.clock_seq,
-               client->id.node);
+        char id_str[37];
+        uuid_to_string(client->id, id_str, sizeof(id_str));
+        printf("ID: %s\n", id_str);
         printf("IP Address: %s\n", client->ip_address ? client->ip_address : "Unknown");
         printf("Hostname: %s\n", client->hostname ? client->hostname : "Unknown");
         printf("OS Info: %s\n", client->os_info ? client->os_info : "Unknown");
@@ -544,12 +533,12 @@ static status_t console_cmd_clients(int argc, char** argv) {
         printf("State: %s\n", state_str);
         
         char first_seen_str[30];
-        struct tm* timeinfo = localtime(&client->first_seen);
+        struct tm* timeinfo = localtime(&client->first_seen_time);
         strftime(first_seen_str, sizeof(first_seen_str), "%Y-%m-%d %H:%M:%S", timeinfo);
         printf("First Seen: %s\n", first_seen_str);
         
         char last_seen_str[30];
-        timeinfo = localtime(&client->last_seen);
+        timeinfo = localtime(&client->last_seen_time);
         strftime(last_seen_str, sizeof(last_seen_str), "%Y-%m-%d %H:%M:%S", timeinfo);
         printf("Last Seen: %s\n", last_seen_str);
         
@@ -587,6 +576,7 @@ static status_t console_cmd_clients(int argc, char** argv) {
         // In a real implementation, you would list the loaded modules here
     }
     
+    fprintf(stderr, "Console thread created\n");
     return STATUS_SUCCESS;
 }
 
@@ -638,12 +628,7 @@ static status_t console_cmd_shell(int argc, char** argv) {
     
     // Parse client ID
     uuid_t client_id;
-    if (sscanf(argv[1], "%08x-%04x-%04x-%04x-%012x",
-              &client_id.time_low,
-              &client_id.time_mid,
-              &client_id.time_hi_and_version,
-              &client_id.clock_seq,
-              &client_id.node) != 5) {
+    if (uuid_from_string(argv[1], client_id) != STATUS_SUCCESS) {
         fprintf(stderr, "Error: Invalid client ID format\n");
         return STATUS_ERROR_INVALID_PARAM;
     }
@@ -681,12 +666,9 @@ static status_t console_cmd_shell(int argc, char** argv) {
         return status;
     }
     
-    printf("Task created: %08x-%04x-%04x-%04x-%012x\n",
-           task->id.time_low,
-           task->id.time_mid,
-           task->id.time_hi_and_version,
-           task->id.clock_seq,
-           task->id.node);
+    char id_str[37];
+    uuid_to_string(task->id, id_str, sizeof(id_str));
+    printf("Task created: %s\n", id_str);
     
     return STATUS_SUCCESS;
 }
@@ -702,12 +684,7 @@ static status_t console_cmd_download(int argc, char** argv) {
     
     // Parse client ID
     uuid_t client_id;
-    if (sscanf(argv[1], "%08x-%04x-%04x-%04x-%012x",
-              &client_id.time_low,
-              &client_id.time_mid,
-              &client_id.time_hi_and_version,
-              &client_id.clock_seq,
-              &client_id.node) != 5) {
+    if (uuid_from_string(argv[1], client_id) != STATUS_SUCCESS) {
         fprintf(stderr, "Error: Invalid client ID format\n");
         return STATUS_ERROR_INVALID_PARAM;
     }
@@ -756,12 +733,7 @@ static status_t console_cmd_upload(int argc, char** argv) {
     
     // Parse client ID
     uuid_t client_id;
-    if (sscanf(argv[1], "%08x-%04x-%04x-%04x-%012x",
-              &client_id.time_low,
-              &client_id.time_mid,
-              &client_id.time_hi_and_version,
-              &client_id.clock_seq,
-              &client_id.node) != 5) {
+    if (uuid_from_string(argv[1], client_id) != STATUS_SUCCESS) {
         fprintf(stderr, "Error: Invalid client ID format\n");
         return STATUS_ERROR_INVALID_PARAM;
     }
@@ -797,12 +769,7 @@ static status_t console_cmd_module(int argc, char** argv) {
     
     // Parse client ID
     uuid_t client_id;
-    if (sscanf(argv[1], "%08x-%04x-%04x-%04x-%012x",
-              &client_id.time_low,
-              &client_id.time_mid,
-              &client_id.time_hi_and_version,
-              &client_id.clock_seq,
-              &client_id.node) != 5) {
+    if (uuid_from_string(argv[1], client_id) != STATUS_SUCCESS) {
         fprintf(stderr, "Error: Invalid client ID format\n");
         return STATUS_ERROR_INVALID_PARAM;
     }
@@ -863,12 +830,7 @@ static status_t console_cmd_config(int argc, char** argv) {
     
     // Parse client ID
     uuid_t client_id;
-    if (sscanf(argv[1], "%08x-%04x-%04x-%04x-%012x",
-              &client_id.time_low,
-              &client_id.time_mid,
-              &client_id.time_hi_and_version,
-              &client_id.clock_seq,
-              &client_id.node) != 5) {
+    if (uuid_from_string(argv[1], client_id) != STATUS_SUCCESS) {
         fprintf(stderr, "Error: Invalid client ID format\n");
         return STATUS_ERROR_INVALID_PARAM;
     }
@@ -902,12 +864,7 @@ static status_t console_cmd_switch(int argc, char** argv) {
     
     // Parse client ID
     uuid_t client_id;
-    if (sscanf(argv[1], "%08x-%04x-%04x-%04x-%012x",
-              &client_id.time_low,
-              &client_id.time_mid,
-              &client_id.time_hi_and_version,
-              &client_id.clock_seq,
-              &client_id.node) != 5) {
+    if (uuid_from_string(argv[1], client_id) != STATUS_SUCCESS) {
         fprintf(stderr, "Error: Invalid client ID format\n");
         return STATUS_ERROR_INVALID_PARAM;
     }

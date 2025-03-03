@@ -232,12 +232,13 @@ status_t cmd_pwd(const char* args, uint8_t** result, size_t* result_len) {
 /**
  * @brief Get module commands
  * 
+ * @param module Module to get commands from
  * @param commands_out Pointer to store commands array
  * @param count Pointer to store number of commands
  * @return status_t Status code
  */
-status_t module_get_commands(module_command_t*** commands_out, size_t* count) {
-    if (commands_out == NULL || count == NULL) {
+status_t shell_module_get_commands(module_t* module, module_command_t*** commands_out, size_t* count) {
+    if (module == NULL || commands_out == NULL || count == NULL) {
         return STATUS_ERROR_INVALID_PARAM;
     }
     

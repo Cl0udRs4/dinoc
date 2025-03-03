@@ -1,0 +1,24 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -5,6 +5,7 @@
+ 
+ #include "include/server.h"
+ #include "common/logger.h"
++#include "include/protocol.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -34,6 +35,13 @@ int main(int argc, char** argv) {
+     signal(SIGINT, signal_handler);
+     signal(SIGTERM, signal_handler);
+     
++    // Initialize protocol manager
++    status = protocol_manager_init();
++    if (status != STATUS_SUCCESS) {
++        fprintf(stderr, "Failed to initialize protocol manager: %d\n", status);
++        return 1;
++    }
++    
+     // Initialize server
+     status = server_init(&config);
+     if (status != STATUS_SUCCESS) {

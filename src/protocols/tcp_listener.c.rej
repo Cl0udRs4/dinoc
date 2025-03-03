@@ -1,0 +1,26 @@
+--- src/protocols/tcp_listener.c
++++ src/protocols/tcp_listener.c.new
+@@ -392,7 +392,7 @@ static void* tcp_accept_thread(void* arg) {
+         // Create client thread
+         if (pthread_create(&client_context->thread, NULL, tcp_client_thread, arg) != 0) {
+             LOG_ERROR("Failed to create client thread");
+-            tcp_remove_client(context, client);
++            tcp_remove_client(context, client, listener);
+             continue;
+         }
+         
+@@ -481,12 +481,12 @@ static void* tcp_client_thread(void* arg) {
+     }
+     
+     // Remove client
+-    tcp_remove_client(context, client);
++    tcp_remove_client(context, client, listener);
+     
+     return NULL;
+ }
+ 
+-static void tcp_remove_client(tcp_listener_context_t* context, client_t* client) {
++static void tcp_remove_client(tcp_listener_context_t* context, client_t* client, protocol_listener_t* listener) {
+     pthread_mutex_lock(&context->clients_mutex);
+     
+     // Find client index

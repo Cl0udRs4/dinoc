@@ -1,0 +1,22 @@
+--- a/src/protocols/protocol_manager.c
++++ b/src/protocols/protocol_manager.c
+@@ -211,6 +211,8 @@ status_t protocol_manager_create_listener(protocol_type_t type, const protocol_l
+ status_t protocol_manager_start_listener(protocol_listener_t* listener) {
+     if (listener == NULL) {
+         return STATUS_ERROR_INVALID_PARAM;
++        fprintf(stderr, "Failed to start listener: invalid parameter\n");
++        fflush(stderr);
+     }
+     
+     if (listener->start == NULL) {
+@@ -218,7 +220,11 @@ status_t protocol_manager_start_listener(protocol_listener_t* listener) {
+     }
+     
+     // Call start function
+-    return listener->start(listener);
++    fprintf(stderr, "Calling listener start function\n");
++    fflush(stderr);
++    status_t status = listener->start(listener);
++    fprintf(stderr, "Listener start function returned: %d\n", status);
++    return status;
+ }

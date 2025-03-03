@@ -1,0 +1,102 @@
+--- a/src/protocols/tcp_listener.c
++++ b/src/protocols/tcp_listener.c
+@@ -69,6 +69,8 @@ static void* tcp_client_thread(void* arg);
+ status_t tcp_listener_create(const protocol_listener_config_t* config, protocol_listener_t** listener) {
+     if (config == NULL || listener == NULL) {
+         return STATUS_ERROR_INVALID_PARAM;
++        printf("TCP listener creation failed: invalid parameters\n");
++        fflush(stdout);
+     }
+     
+     // Create listener
+@@ -76,6 +78,8 @@ status_t tcp_listener_create(const protocol_listener_config_t* config, protocol_
+     if (new_listener == NULL) {
+         return STATUS_ERROR_MEMORY;
+     }
++    printf("TCP listener object created\n");
++    fflush(stdout);
+     
+     // Create context
+     tcp_listener_context_t* context = (tcp_listener_context_t*)malloc(sizeof(tcp_listener_context_t));
+@@ -83,6 +87,8 @@ status_t tcp_listener_create(const protocol_listener_config_t* config, protocol_
+         free(new_listener);
+         return STATUS_ERROR_MEMORY;
+     }
++    printf("TCP listener context created\n");
++    fflush(stdout);
+     
+     // Initialize context
+     memset(context, 0, sizeof(tcp_listener_context_t));
+@@ -138,6 +144,8 @@ status_t tcp_listener_create(const protocol_listener_config_t* config, protocol_
+     new_listener->send_message = tcp_listener_send_message;
+     new_listener->register_callbacks = tcp_listener_register_callbacks;
+     
++    printf("TCP listener fully initialized\n");
++    fflush(stdout);
+     *listener = new_listener;
+     
+     return STATUS_SUCCESS;
+@@ -148,6 +156,8 @@ status_t tcp_listener_create(const protocol_listener_config_t* config, protocol_
+ static status_t tcp_listener_start(protocol_listener_t* listener) {
+     if (listener == NULL || listener->protocol_context == NULL) {
+         return STATUS_ERROR_INVALID_PARAM;
++        printf("TCP listener start failed: invalid parameters\n");
++        fflush(stdout);
+     }
+     
+     tcp_listener_context_t* context = (tcp_listener_context_t*)listener->protocol_context;
+@@ -155,12 +165,16 @@ static status_t tcp_listener_start(protocol_listener_t* listener) {
+     // Check if already running
+     if (context->running) {
+         return STATUS_ERROR_ALREADY_RUNNING;
++        printf("TCP listener start failed: already running\n");
++        fflush(stdout);
+     }
+     
+     // Create server socket
+     context->server_socket = socket(AF_INET, SOCK_STREAM, 0);
+     if (context->server_socket < 0) {
+         return STATUS_ERROR_SOCKET;
++        printf("TCP listener start failed: socket creation error\n");
++        fflush(stdout);
+     }
+     
+     // Set socket options
+@@ -169,6 +183,8 @@ static status_t tcp_listener_start(protocol_listener_t* listener) {
+         close(context->server_socket);
+         context->server_socket = -1;
+         return STATUS_ERROR_SOCKET;
++        printf("TCP listener start failed: setsockopt error\n");
++        fflush(stdout);
+     }
+     
+     // Bind socket
+@@ -182,6 +198,8 @@ static status_t tcp_listener_start(protocol_listener_t* listener) {
+         close(context->server_socket);
+         context->server_socket = -1;
+         return STATUS_ERROR_BIND;
++        printf("TCP listener start failed: bind error for %s:%d\n", context->bind_address, context->port);
++        fflush(stdout);
+     }
+     
+     // Listen for connections
+@@ -189,6 +207,8 @@ static status_t tcp_listener_start(protocol_listener_t* listener) {
+         close(context->server_socket);
+         context->server_socket = -1;
+         return STATUS_ERROR_LISTEN;
++        printf("TCP listener start failed: listen error\n");
++        fflush(stdout);
+     }
+     
+     // Set running flag
+@@ -200,8 +220,11 @@ static status_t tcp_listener_start(protocol_listener_t* listener) {
+         context->server_socket = -1;
+         context->running = false;
+         return STATUS_ERROR_THREAD;
++        printf("TCP listener start failed: thread creation error\n");
++        fflush(stdout);
+     }
+     
++    printf("TCP listener started successfully on %s:%d\n", context->bind_address, context->port);
+     return STATUS_SUCCESS;
+ }

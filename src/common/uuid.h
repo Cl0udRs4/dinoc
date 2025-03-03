@@ -9,17 +9,11 @@
 #include "../include/common.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <uuid/uuid.h>
 
 /**
- * @brief UUID structure (RFC 4122)
+ * @brief UUID wrapper for system uuid
  */
-typedef struct {
-    uint32_t time_low;
-    uint16_t time_mid;
-    uint16_t time_hi_and_version;
-    uint16_t clock_seq;
-    uint64_t node;
-} uuid_t;
 
 /**
  * @brief Initialize UUID generator
@@ -36,12 +30,20 @@ status_t uuid_init(void);
 status_t uuid_shutdown(void);
 
 /**
- * @brief Generate a new UUID
+ * @brief Generate a new UUID (wrapper for system uuid_generate)
  * 
- * @param uuid Pointer to store generated UUID
+ * @param uuid UUID to generate
  * @return status_t Status code
  */
-status_t uuid_generate(uuid_t* uuid);
+status_t uuid_generate_wrapper(uuid_t uuid);
+
+/**
+ * @brief Compatibility function for old code that uses uuid_generate with pointer
+ * 
+ * @param uuid Pointer to UUID to generate
+ * @return status_t Status code
+ */
+status_t uuid_generate_compat(uuid_t* uuid);
 
 /**
  * @brief Convert UUID to string
@@ -51,7 +53,7 @@ status_t uuid_generate(uuid_t* uuid);
  * @param size Buffer size
  * @return status_t Status code
  */
-status_t uuid_to_string(const uuid_t* uuid, char* str, size_t size);
+status_t uuid_to_string(const uuid_t uuid, char* str, size_t size);
 
 /**
  * @brief Parse UUID from string
@@ -60,31 +62,15 @@ status_t uuid_to_string(const uuid_t* uuid, char* str, size_t size);
  * @param uuid Pointer to store parsed UUID
  * @return status_t Status code
  */
-status_t uuid_from_string(const char* str, uuid_t* uuid);
+status_t uuid_from_string(const char* str, uuid_t uuid);
 
 /**
- * @brief Compare two UUIDs
+ * @brief Compare two UUIDs (wrapper for system uuid_compare)
  * 
  * @param uuid1 First UUID
  * @param uuid2 Second UUID
  * @return int 0 if equal, negative if uuid1 < uuid2, positive if uuid1 > uuid2
  */
-int uuid_compare(const uuid_t* uuid1, const uuid_t* uuid2);
-
-/**
- * @brief Check if UUID is null
- * 
- * @param uuid UUID to check
- * @return bool True if UUID is null
- */
-bool uuid_is_null(const uuid_t* uuid);
-
-/**
- * @brief Set UUID to null
- * 
- * @param uuid UUID to set
- * @return status_t Status code
- */
-status_t uuid_clear(uuid_t* uuid);
+int uuid_compare_wrapper(const uuid_t uuid1, const uuid_t uuid2);
 
 #endif /* DINOC_UUID_H */
