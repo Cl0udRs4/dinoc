@@ -17,6 +17,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
+// Heartbeat magic number
+#define HEARTBEAT_MAGIC 0x48454152  // "HEAR"
+
 // UDP listener context
 typedef struct {
     int server_socket;
@@ -219,13 +222,19 @@ static status_t udp_listener_stop(protocol_listener_t* listener) {
     for (size_t i = 0; i < context->client_count; i++) {
         client_t* client = context->clients[i];
         
+        // Update client state
+        client_update_state(client, CLIENT_STATE_DISCONNECTED);
+        
         // Call client disconnected callback
         if (context->on_client_disconnected != NULL) {
             context->on_client_disconnected(listener, client);
         }
         
-        // Destroy client
-        client_destroy(client);
+        // Free protocol context
+        if (client->protocol_context != NULL) {
+            free(client->protocol_context);
+            client->protocol_context = NULL;
+        }
     }
     
     context->client_count = 0;
@@ -284,9 +293,16 @@ static status_t udp_listener_send_message(protocol_listener_t* listener, client_
         return STATUS_ERROR_NOT_RUNNING;
     }
     
+    // Get client address from protocol context
+    if (client->protocol_context == NULL) {
+        return STATUS_ERROR_INVALID_PARAM;
+    }
+    
+    struct sockaddr_in* client_addr = (struct sockaddr_in*)client->protocol_context;
+    
     // Send message
     ssize_t sent = sendto(context->server_socket, message->data, message->data_len, 0,
-                         (struct sockaddr*)&client->addr, client->addr_len);
+                         (struct sockaddr*)client_addr, sizeof(struct sockaddr_in));
     
     if (sent != (ssize_t)message->data_len) {
         return STATUS_ERROR_SEND;
@@ -370,9 +386,22 @@ static void* udp_receive_thread(void* arg) {
         memcpy(message.data, buffer, recv_len);
         message.data_len = recv_len;
         
-        // Call message received callback
-        if (context->on_message_received != NULL) {
-            context->on_message_received(listener, client, &message);
+        // Check if this is a heartbeat message
+        if (message.data_len == sizeof(uint32_t) && 
+            *((uint32_t*)message.data) == HEARTBEAT_MAGIC) {
+            // Process heartbeat
+            client_heartbeat(client);
+            
+            // Update client state if needed
+            if (client->state == CLIENT_STATE_CONNECTED || 
+                client->state == CLIENT_STATE_REGISTERED) {
+                client_update_state(client, CLIENT_STATE_ACTIVE);
+            }
+        } else {
+            // Call message received callback
+            if (context->on_message_received != NULL) {
+                context->on_message_received(listener, client, &message);
+            }
         }
         
         // Free message data
@@ -392,34 +421,56 @@ static client_t* udp_find_or_create_client(udp_listener_context_t* context, stru
     for (size_t i = 0; i < context->client_count; i++) {
         client_t* client = context->clients[i];
         
-        if (client->addr_len == addr_len &&
-            memcmp(&client->addr, addr, addr_len) == 0) {
-            pthread_mutex_unlock(&context->clients_mutex);
-            return client;
+        if (client->protocol_context != NULL) {
+            struct sockaddr_in* client_addr = (struct sockaddr_in*)client->protocol_context;
+            
+            if (client_addr->sin_addr.s_addr == addr->sin_addr.s_addr &&
+                client_addr->sin_port == addr->sin_port) {
+                pthread_mutex_unlock(&context->clients_mutex);
+                return client;
+            }
         }
     }
     
-    // Create new client
-    client_t* client = client_create();
+    pthread_mutex_unlock(&context->clients_mutex);
     
-    if (client == NULL) {
-        pthread_mutex_unlock(&context->clients_mutex);
+    // Create client context
+    void* protocol_context = malloc(sizeof(struct sockaddr_in));
+    if (protocol_context == NULL) {
         return NULL;
     }
     
-    // Set client address
-    memcpy(&client->addr, addr, addr_len);
-    client->addr_len = addr_len;
+    // Set protocol context
+    memcpy(protocol_context, addr, sizeof(struct sockaddr_in));
+    
+    // Register client
+    client_t* client = NULL;
+    protocol_listener_t* listener = (protocol_listener_t*)context;
+    status_t status = client_register(listener, protocol_context, &client);
+    
+    if (status != STATUS_SUCCESS) {
+        free(protocol_context);
+        return NULL;
+    }
+    
+    // Update client state
+    client_update_state(client, CLIENT_STATE_CONNECTED);
+    
+    // Update client information
+    char ip_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr->sin_addr, ip_str, sizeof(ip_str));
+    client_update_info(client, NULL, ip_str, NULL);
     
     // Add client to array
+    pthread_mutex_lock(&context->clients_mutex);
+    
     if (context->client_count >= context->client_capacity) {
         size_t new_capacity = context->client_capacity * 2;
         client_t** new_clients = (client_t**)realloc(context->clients, new_capacity * sizeof(client_t*));
         
         if (new_clients == NULL) {
             pthread_mutex_unlock(&context->clients_mutex);
-            client_destroy(client);
-            return NULL;
+            return client;  // Still return the client, just don't add to array
         }
         
         context->clients = new_clients;
@@ -431,7 +482,7 @@ static client_t* udp_find_or_create_client(udp_listener_context_t* context, stru
     
     // Call client connected callback
     if (context->on_client_connected != NULL) {
-        context->on_client_connected((protocol_listener_t*)context, client);
+        context->on_client_connected(listener, client);
     }
     
     return client;

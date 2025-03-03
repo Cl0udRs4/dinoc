@@ -17,6 +17,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
+// Heartbeat magic number
+#define HEARTBEAT_MAGIC 0x48454152  // "HEAR"
+
 // TCP listener context
 typedef struct {
     int server_socket;
@@ -232,19 +235,27 @@ static status_t tcp_listener_stop(protocol_listener_t* listener) {
     for (size_t i = 0; i < context->client_count; i++) {
         client_t* client = context->clients[i];
         
+        // Update client state
+        client_update_state(client, CLIENT_STATE_DISCONNECTED);
+        
         // Call client disconnected callback
         if (context->on_client_disconnected != NULL) {
             context->on_client_disconnected(listener, client);
         }
         
-        // Close client socket
-        if (client->socket >= 0) {
-            close(client->socket);
-            client->socket = -1;
+        // Get client socket from protocol context
+        if (client->protocol_context != NULL) {
+            int client_socket = *((int*)client->protocol_context);
+            
+            // Close client socket
+            if (client_socket >= 0) {
+                close(client_socket);
+            }
+            
+            // Free protocol context
+            free(client->protocol_context);
+            client->protocol_context = NULL;
         }
-        
-        // Destroy client
-        client_destroy(client);
     }
     
     context->client_count = 0;
@@ -303,8 +314,12 @@ static status_t tcp_listener_send_message(protocol_listener_t* listener, client_
         return STATUS_ERROR_NOT_RUNNING;
     }
     
-    // Get client socket
-    int client_socket = client->socket;
+    // Get client socket from protocol context
+    if (client->protocol_context == NULL) {
+        return STATUS_ERROR_INVALID_PARAM;
+    }
+    
+    int client_socket = *((int*)client->protocol_context);
     
     if (client_socket < 0) {
         return STATUS_ERROR_SOCKET;
@@ -366,18 +381,40 @@ static void* tcp_accept_thread(void* arg) {
             break;
         }
         
-        // Create client
-        client_t* client = client_create();
-        
-        if (client == NULL) {
+        // Create client context
+        void* protocol_context = malloc(sizeof(struct sockaddr_in) + sizeof(socklen_t) + sizeof(int));
+        if (protocol_context == NULL) {
             close(client_socket);
             continue;
         }
         
-        // Set client socket and address
-        client->socket = client_socket;
-        memcpy(&client->addr, &client_addr, sizeof(client_addr));
-        client->addr_len = client_addr_len;
+        // Set protocol context
+        int* socket_ptr = (int*)protocol_context;
+        *socket_ptr = client_socket;
+        
+        struct sockaddr_in* addr_ptr = (struct sockaddr_in*)(socket_ptr + 1);
+        memcpy(addr_ptr, &client_addr, sizeof(client_addr));
+        
+        socklen_t* addr_len_ptr = (socklen_t*)(addr_ptr + 1);
+        *addr_len_ptr = client_addr_len;
+        
+        // Register client
+        client_t* client = NULL;
+        status_t status = client_register(listener, protocol_context, &client);
+        
+        if (status != STATUS_SUCCESS) {
+            free(protocol_context);
+            close(client_socket);
+            continue;
+        }
+        
+        // Update client state
+        client_update_state(client, CLIENT_STATE_CONNECTED);
+        
+        // Update client information
+        char ip_str[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &client_addr.sin_addr, ip_str, sizeof(ip_str));
+        client_update_info(client, NULL, ip_str, NULL);
         
         // Add client to array
         pthread_mutex_lock(&context->clients_mutex);
@@ -469,20 +506,41 @@ static void* tcp_client_thread(void* arg) {
     // Free thread argument
     free(thread_arg);
     
+    // Get client socket from protocol context
+    if (client->protocol_context == NULL) {
+        // Error: Invalid protocol context
+        tcp_remove_client(context, client);
+        
+        // Update client state
+        client_update_state(client, CLIENT_STATE_DISCONNECTED);
+        
+        // Call client disconnected callback
+        if (context->on_client_disconnected != NULL) {
+            context->on_client_disconnected(listener, client);
+        }
+        
+        return NULL;
+    }
+    
+    int client_socket = *((int*)client->protocol_context);
+    
     // Set socket timeout
     struct timeval tv;
     tv.tv_sec = context->timeout_ms / 1000;
     tv.tv_usec = (context->timeout_ms % 1000) * 1000;
     
-    if (setsockopt(client->socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+    if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
         perror("setsockopt");
     }
+    
+    // Update client state
+    client_update_state(client, CLIENT_STATE_REGISTERED);
     
     // Receive messages
     while (context->running) {
         // Receive message length
         uint32_t length_network;
-        ssize_t recv_result = recv(client->socket, &length_network, sizeof(length_network), 0);
+        ssize_t recv_result = recv(client_socket, &length_network, sizeof(length_network), 0);
         
         if (recv_result <= 0) {
             if (recv_result == 0 || errno != EAGAIN) {
@@ -508,7 +566,7 @@ static void* tcp_client_thread(void* arg) {
         size_t total_received = 0;
         
         while (total_received < length) {
-            recv_result = recv(client->socket, buffer + total_received, length - total_received, 0);
+            recv_result = recv(client_socket, buffer + total_received, length - total_received, 0);
             
             if (recv_result <= 0) {
                 if (recv_result == 0 || errno != EAGAIN) {
@@ -534,9 +592,16 @@ static void* tcp_client_thread(void* arg) {
         message.data = buffer;
         message.data_len = length;
         
-        // Call message received callback
-        if (context->on_message_received != NULL) {
-            context->on_message_received(listener, client, &message);
+        // Check if this is a heartbeat message
+        if (message.data_len == sizeof(uint32_t) && 
+            *((uint32_t*)message.data) == HEARTBEAT_MAGIC) {
+            // Process heartbeat
+            client_heartbeat(client);
+        } else {
+            // Call message received callback
+            if (context->on_message_received != NULL) {
+                context->on_message_received(listener, client, &message);
+            }
         }
         
         // Free buffer
@@ -546,14 +611,16 @@ static void* tcp_client_thread(void* arg) {
     // Remove client from array
     tcp_remove_client(context, client);
     
+    // Update client state
+    client_update_state(client, CLIENT_STATE_DISCONNECTED);
+    
     // Call client disconnected callback
     if (context->on_client_disconnected != NULL) {
         context->on_client_disconnected(listener, client);
     }
     
-    // Close socket and destroy client
-    close(client->socket);
-    client_destroy(client);
+    // Close socket
+    close(client_socket);
     
     return NULL;
 }
