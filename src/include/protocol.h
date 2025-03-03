@@ -43,6 +43,7 @@ typedef struct {
 struct protocol_listener {
     uuid_t id;
     protocol_type_t protocol_type;
+    void* protocol_context;  // Protocol-specific context
     
     // Function pointers
     status_t (*start)(protocol_listener_t* listener);
