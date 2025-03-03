@@ -259,3 +259,34 @@ status_t protocol_manager_register_callbacks(protocol_listener_t* listener,
     
     return listener->register_callbacks(listener, on_message_received, on_client_connected, on_client_disconnected);
 }
+
+/**
+ * @brief Get callbacks from a protocol listener
+ */
+status_t protocol_manager_get_callbacks(protocol_listener_t* listener,
+                                      void (**on_message_received)(protocol_listener_t*, client_t*, protocol_message_t*),
+                                      void (**on_client_connected)(protocol_listener_t*, client_t*),
+                                      void (**on_client_disconnected)(protocol_listener_t*, client_t*)) {
+    if (global_manager == NULL) {
+        return STATUS_ERROR_NOT_FOUND;
+    }
+    
+    if (listener == NULL) {
+        return STATUS_ERROR_INVALID_PARAM;
+    }
+    
+    // Get callbacks from listener context
+    if (on_message_received != NULL) {
+        *on_message_received = listener->on_message_received;
+    }
+    
+    if (on_client_connected != NULL) {
+        *on_client_connected = listener->on_client_connected;
+    }
+    
+    if (on_client_disconnected != NULL) {
+        *on_client_disconnected = listener->on_client_disconnected;
+    }
+    
+    return STATUS_SUCCESS;
+}
