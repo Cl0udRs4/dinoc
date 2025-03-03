@@ -197,6 +197,8 @@ static void* client_thread(void* arg) {
     options.flags = ARES_FLAG_STAYOPEN;
     options.timeout = 1000;
     options.tries = 3;
+    options.servers = NULL;
+    options.nservers = 0;
     
     status = ares_init_options(&channel, &options, ARES_OPT_FLAGS | ARES_OPT_TIMEOUT | ARES_OPT_TRIES);
     
@@ -221,55 +223,29 @@ static void* client_thread(void* arg) {
     fd_set read_fds, write_fds;
     int nfds = 0;
     
-    struct timeval tv;
-    tv.tv_sec = 5;
-    tv.tv_usec = 0;
+    struct timeval tv, *tvp;
+    time_t start_time = time(NULL);
     
-    FD_ZERO(&read_fds);
-    FD_ZERO(&write_fds);
-    
-    ares_fds(channel, &read_fds, &write_fds);
-    nfds = ares_socket_max(channel, nfds);
-    
-    if (nfds > 0) {
-        select(nfds + 1, &read_fds, &write_fds, NULL, &tv);
-        ares_process(channel, &read_fds, &write_fds);
+    while (time(NULL) - start_time < 5 && !message_received) {
+        FD_ZERO(&read_fds);
+        FD_ZERO(&write_fds);
+        
+        tvp = ares_timeout(channel, NULL, &tv);
+        ares_fds(channel, &read_fds, &write_fds);
+        nfds = ares_socket_max(channel, nfds);
+        
+        if (nfds > 0) {
+            select(nfds + 1, &read_fds, &write_fds, NULL, tvp);
+            ares_process(channel, &read_fds, &write_fds);
+        } else {
+            // No file descriptors, sleep a bit
+            usleep(100000);
+        }
     }
     
     // Clean up
     ares_destroy(channel);
     ares_library_cleanup();
-    
-    // Simulate client connection
-    client_t* client = client_create();
-    
-    if (client == NULL) {
-        printf("Failed to create client\n");
-        return NULL;
-    }
-    
-    // Set client address
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(12345);
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    
-    memcpy(&client->addr, &addr, sizeof(addr));
-    client->addr_len = sizeof(addr);
-    
-    // Simulate client connection callback
-    on_client_connected(listener, client);
-    
-    // Simulate message from client
-    protocol_message_t message;
-    message.data = (uint8_t*)strdup(TEST_MESSAGE);
-    message.data_len = strlen(TEST_MESSAGE);
-    
-    on_message_received(listener, client, &message);
-    
-    // Clean up
-    free(message.data);
     
     return NULL;
 }

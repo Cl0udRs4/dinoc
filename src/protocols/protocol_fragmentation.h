@@ -15,6 +15,15 @@
 #include "../include/client.h"
 
 /**
+ * @brief Fragment flags
+ */
+#define FRAGMENT_FLAG_NONE      0x00
+#define FRAGMENT_FLAG_COMPRESSED 0x01
+#define FRAGMENT_FLAG_ENCRYPTED 0x02
+#define FRAGMENT_FLAG_PRIORITY  0x04
+#define FRAGMENT_FLAG_RESEND    0x08
+
+/**
  * @brief Fragment header structure
  */
 typedef struct {
@@ -22,6 +31,7 @@ typedef struct {
     uint8_t fragment_index;     // Position of this fragment in the sequence
     uint8_t total_fragments;    // Total number of fragments in the message
     uint8_t flags;              // Control flags for special handling
+    uint16_t checksum;          // Checksum for fragment integrity verification
 } __attribute__((packed)) fragment_header_t;
 
 /**

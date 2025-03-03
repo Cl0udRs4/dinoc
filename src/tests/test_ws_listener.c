@@ -177,42 +177,76 @@ static void test_ws_message_send_receive(void) {
  * @brief Client thread function
  */
 static void* client_thread(void* arg) {
-    // TODO: Implement WebSocket client
-    // For now, we'll simulate a client connection and message
-    
     // Sleep for a bit to allow server to start
     sleep(1);
     
-    // Simulate client connection
-    client_t* client = client_create();
+    // Create a real WebSocket client connection
+    struct lws_context_creation_info info;
+    memset(&info, 0, sizeof(info));
     
-    if (client == NULL) {
-        printf("Failed to create client\n");
+    info.port = CONTEXT_PORT_NO_LISTEN;
+    info.protocols = NULL;
+    info.gid = -1;
+    info.uid = -1;
+    
+    struct lws_context* context = lws_create_context(&info);
+    if (!context) {
+        printf("Failed to create LWS context\n");
         return NULL;
     }
     
-    // Set client address
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(12345);
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    struct lws_client_connect_info conn_info;
+    memset(&conn_info, 0, sizeof(conn_info));
     
-    memcpy(&client->addr, &addr, sizeof(addr));
-    client->addr_len = sizeof(addr);
+    conn_info.context = context;
+    conn_info.address = TEST_BIND_ADDRESS;
+    conn_info.port = TEST_PORT;
+    conn_info.path = TEST_WS_PATH;
+    conn_info.host = conn_info.address;
+    conn_info.origin = conn_info.address;
+    conn_info.protocol = "dinoc-protocol";
     
-    // Simulate client connection callback
-    on_client_connected(listener, client);
+    struct lws* wsi = lws_client_connect_via_info(&conn_info);
+    if (!wsi) {
+        printf("Failed to connect to WebSocket server\n");
+        lws_context_destroy(context);
+        return NULL;
+    }
     
-    // Simulate message from client
-    protocol_message_t message;
-    message.data = (uint8_t*)strdup(TEST_MESSAGE);
-    message.data_len = strlen(TEST_MESSAGE);
+    printf("Connected to WebSocket server\n");
     
-    on_message_received(listener, client, &message);
+    // Send test message
+    uint8_t* buffer = (uint8_t*)malloc(LWS_PRE + strlen(TEST_MESSAGE));
+    if (!buffer) {
+        printf("Failed to allocate message buffer\n");
+        lws_context_destroy(context);
+        return NULL;
+    }
+    
+    memcpy(buffer + LWS_PRE, TEST_MESSAGE, strlen(TEST_MESSAGE));
+    
+    // Request write callback
+    lws_callback_on_writable(wsi);
+    
+    // Service the LWS context for a few seconds to allow message exchange
+    time_t start_time = time(NULL);
+    while (time(NULL) - start_time < 5 && !message_received) {
+        lws_service(context, 100);
+        
+        // Check if we can write
+        if (lws_is_writable(wsi)) {
+            int result = lws_write(wsi, buffer + LWS_PRE, strlen(TEST_MESSAGE), LWS_WRITE_BINARY);
+            if (result < 0) {
+                printf("Failed to send message\n");
+                break;
+            }
+            printf("Message sent\n");
+        }
+    }
     
     // Clean up
-    free(message.data);
+    free(buffer);
+    lws_context_destroy(context);
     
     return NULL;
 }
