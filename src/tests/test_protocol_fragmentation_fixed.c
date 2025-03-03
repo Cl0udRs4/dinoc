@@ -7,6 +7,7 @@
 #include "../include/common.h"
 #include "../include/client.h"
 #include "../protocols/protocol_fragmentation.h"
+#include "../common/uuid.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,7 +72,7 @@ static void test_fragmentation_reassembly(void) {
     // Create mock protocol listener
     protocol_listener_t listener;
     memset(&listener, 0, sizeof(listener));
-    uuid_generate(&listener.id);
+    uuid_generate_compat(&listener.id);
     listener.protocol_type = PROTOCOL_TYPE_TCP;
     
     // Mock send_message function to avoid segmentation fault
@@ -210,7 +211,7 @@ static void test_fragment_timeout(void) {
     // Create mock protocol listener
     protocol_listener_t listener;
     memset(&listener, 0, sizeof(listener));
-    uuid_generate(&listener.id);
+    uuid_generate_compat(&listener.id);
     listener.protocol_type = PROTOCOL_TYPE_TCP;
     
     // Mock send_message function to avoid segmentation fault

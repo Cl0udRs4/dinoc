@@ -6,6 +6,8 @@
 #include "../include/api.h"
 #include "../include/common.h"
 #include "../include/task.h"
+#include "../common/uuid.h"
+#include "../common/base64.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -101,7 +103,7 @@ status_t api_tasks_post(struct MHD_Connection* connection,
     const char* client_id_str = json_string_value(client_id_json);
     uuid_t client_id;
     
-    status = uuid_parse(client_id_str, &client_id);
+    status = uuid_from_string(client_id_str, client_id);
     if (status != STATUS_SUCCESS) {
         json_decref(json);
         return http_server_send_response(connection, 400, "text/plain", "Invalid client_id");
@@ -123,7 +125,11 @@ status_t api_tasks_post(struct MHD_Connection* connection,
     
     if (json_is_string(data_json)) {
         const char* data_str = json_string_value(data_json);
-        data = base64_decode(data_str, &data_len);
+        size_t str_len = strlen(data_str);
+        data = (uint8_t*)malloc(str_len); // Allocate enough space for decoded data
+        if (data != NULL) {
+            data_len = base64_decode(data_str, str_len, data, str_len);
+        }
     }
     
     // Extract timeout
@@ -174,7 +180,7 @@ status_t api_task_get(struct MHD_Connection* connection,
                     const char* upload_data, size_t upload_data_size) {
     // Extract task ID from URL
     uuid_t task_id;
-    status_t status = http_server_extract_uuid_from_url(url, "/api/tasks/", &task_id);
+    status_t status = http_server_extract_uuid_from_url(url, "/api/tasks/", task_id);
     
     if (status != STATUS_SUCCESS) {
         return http_server_send_response(connection, 400, "text/plain", "Invalid task ID");
@@ -209,7 +215,7 @@ status_t api_task_state_put(struct MHD_Connection* connection,
                           const char* upload_data, size_t upload_data_size) {
     // Extract task ID from URL
     uuid_t task_id;
-    status_t status = http_server_extract_uuid_from_url(url, "/api/tasks/", &task_id);
+    status_t status = http_server_extract_uuid_from_url(url, "/api/tasks/", task_id);
     
     if (status != STATUS_SUCCESS) {
         return http_server_send_response(connection, 400, "text/plain", "Invalid task ID");
@@ -272,7 +278,7 @@ status_t api_task_result_post(struct MHD_Connection* connection,
                             const char* upload_data, size_t upload_data_size) {
     // Extract task ID from URL
     uuid_t task_id;
-    status_t status = http_server_extract_uuid_from_url(url, "/api/tasks/", &task_id);
+    status_t status = http_server_extract_uuid_from_url(url, "/api/tasks/", task_id);
     
     if (status != STATUS_SUCCESS) {
         return http_server_send_response(connection, 400, "text/plain", "Invalid task ID");
@@ -301,7 +307,11 @@ status_t api_task_result_post(struct MHD_Connection* connection,
     
     const char* result_str = json_string_value(result_json);
     size_t result_len = 0;
-    uint8_t* result = base64_decode(result_str, &result_len);
+    size_t str_len = strlen(result_str);
+    uint8_t* result = (uint8_t*)malloc(str_len); // Allocate enough space for decoded data
+    if (result != NULL) {
+        result_len = base64_decode(result_str, str_len, result, str_len);
+    }
     
     if (result == NULL) {
         json_decref(json);
@@ -357,7 +367,7 @@ status_t api_client_tasks_get(struct MHD_Connection* connection,
                             const char* upload_data, size_t upload_data_size) {
     // Extract client ID from URL
     uuid_t client_id;
-    status_t status = http_server_extract_uuid_from_url(url, "/api/clients/", &client_id);
+    status_t status = http_server_extract_uuid_from_url(url, "/api/clients/", client_id);
     
     if (status != STATUS_SUCCESS) {
         return http_server_send_response(connection, 400, "text/plain", "Invalid client ID");
@@ -404,13 +414,13 @@ static json_t* task_to_json(const task_t* task) {
     }
     
     // Add task ID
-    char task_id_str[UUID_STR_LEN];
-    uuid_to_string(&task->id, task_id_str);
+    char task_id_str[37];
+    uuid_to_string(task->id, task_id_str, sizeof(task_id_str));
     json_object_set_new(json, "id", json_string(task_id_str));
     
     // Add client ID
-    char client_id_str[UUID_STR_LEN];
-    uuid_to_string(&task->client_id, client_id_str);
+    char client_id_str[37];
+    uuid_to_string(task->client_id, client_id_str, sizeof(client_id_str));
     json_object_set_new(json, "client_id", json_string(client_id_str));
     
     // Add task type
@@ -439,18 +449,30 @@ static json_t* task_to_json(const task_t* task) {
     
     // Add data
     if (task->data != NULL && task->data_len > 0) {
-        char* data_base64 = base64_encode(task->data, task->data_len);
+        // Calculate required buffer size for base64 encoding (4*n/3 + padding)
+        size_t output_len = ((task->data_len + 2) / 3) * 4 + 1;
+        char* data_base64 = (char*)malloc(output_len);
         if (data_base64 != NULL) {
-            json_object_set_new(json, "data", json_string(data_base64));
+            size_t encoded_len = base64_encode(task->data, task->data_len, data_base64, output_len);
+            if (encoded_len > 0) {
+                data_base64[encoded_len] = '\0'; // Ensure null termination
+                json_object_set_new(json, "data", json_string(data_base64));
+            }
             free(data_base64);
         }
     }
     
     // Add result
     if (task->result != NULL && task->result_len > 0) {
-        char* result_base64 = base64_encode(task->result, task->result_len);
+        // Calculate required buffer size for base64 encoding (4*n/3 + padding)
+        size_t output_len = ((task->result_len + 2) / 3) * 4 + 1;
+        char* result_base64 = (char*)malloc(output_len);
         if (result_base64 != NULL) {
-            json_object_set_new(json, "result", json_string(result_base64));
+            size_t encoded_len = base64_encode(task->result, task->result_len, result_base64, output_len);
+            if (encoded_len > 0) {
+                result_base64[encoded_len] = '\0'; // Ensure null termination
+                json_object_set_new(json, "result", json_string(result_base64));
+            }
             free(result_base64);
         }
     }

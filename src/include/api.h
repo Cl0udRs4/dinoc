@@ -34,7 +34,7 @@ status_t http_server_send_response(struct MHD_Connection* connection, int status
                                  const char* content_type, const char* response);
 status_t http_server_send_json_response(struct MHD_Connection* connection, int status_code, json_t* json);
 status_t http_server_parse_json_request(const char* upload_data, size_t upload_data_size, json_t** json);
-status_t http_server_extract_uuid_from_url(const char* url, const char* prefix, uuid_t* uuid);
+status_t http_server_extract_uuid_from_url(const char* url, const char* prefix, uuid_t uuid);
 
 // Task API handlers
 status_t register_task_api_handlers(void);

@@ -3,6 +3,8 @@
  * @brief Configuration management implementation for C2 server
  */
 
+#define _GNU_SOURCE /* For strdup */
+
 #include "config.h"
 #include "logger.h"
 #include <stdio.h>

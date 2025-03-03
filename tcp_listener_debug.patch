@@ -1,0 +1,93 @@
+--- src/protocols/tcp_listener.c.orig2
++++ src/protocols/tcp_listener.c
+@@ -3,6 +3,8 @@
+  * @brief TCP protocol listener implementation
+  */
+ 
++#define _GNU_SOURCE /* For strdup */
++
+ #include "../include/protocol.h"
+ #include "../include/client.h"
+ #include "../common/logger.h"
+@@ -156,6 +158,9 @@
+ static status_t tcp_listener_start(protocol_listener_t* listener) {
+     if (listener == NULL || listener->protocol_context == NULL) {
++        LOG_ERROR("TCP listener start failed: invalid parameter");
++        fprintf(stderr, "TCP listener start failed: invalid parameter\n");
++        fflush(stderr);
+         return STATUS_ERROR_INVALID_PARAM;
+     }
+     
+@@ -163,11 +168,17 @@
+     
+     // Check if already running
+     if (context->running) {
++        LOG_ERROR("TCP listener start failed: already running");
++        fprintf(stderr, "TCP listener start failed: already running\n");
++        fflush(stderr);
+         return STATUS_ERROR_ALREADY_RUNNING;
+     }
+     
+     // Create server socket
+     context->server_socket = socket(AF_INET, SOCK_STREAM, 0);
++    LOG_INFO("TCP listener: Created server socket: %d", context->server_socket);
++    fprintf(stderr, "TCP listener: Created server socket: %d\n", context->server_socket);
++    fflush(stderr);
+     if (context->server_socket < 0) {
+         LOG_ERROR("Failed to create server socket: %s", strerror(errno));
+         return STATUS_ERROR_SOCKET;
+@@ -176,6 +187,8 @@
+     // Set socket options
+     int opt = 1;
+     if (setsockopt(context->server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
++        fprintf(stderr, "TCP listener start failed: setsockopt error: %s\n", strerror(errno));
++        fflush(stderr);
+         LOG_ERROR("Failed to set socket options: %s", strerror(errno));
+         close(context->server_socket);
+         context->server_socket = -1;
+@@ -190,7 +203,11 @@
+     if (server_addr.sin_addr.s_addr == INADDR_NONE) {
+         server_addr.sin_addr.s_addr = INADDR_ANY;
+     }
++    
+     server_addr.sin_port = htons(context->port);
++    
++    LOG_INFO("TCP listener: Binding to %s:%d", context->bind_address, context->port);
++    fprintf(stderr, "TCP listener: Binding to %s:%d\n", context->bind_address, context->port);
+     
+     if (bind(context->server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+         LOG_ERROR("Failed to bind socket: %s", strerror(errno));
+@@ -198,9 +215,15 @@
+         context->server_socket = -1;
+         return STATUS_ERROR_BIND;
+     }
++    
++    LOG_INFO("TCP listener: Bound socket to %s:%d", context->bind_address, context->port);
++    fprintf(stderr, "TCP listener: Bound socket to %s:%d\n", context->bind_address, context->port);
++    fflush(stderr);
+     
+     // Listen for connections
+     if (listen(context->server_socket, 5) < 0) {
++        fprintf(stderr, "TCP listener start failed: listen error: %s\n", strerror(errno));
++        fflush(stderr);
+         LOG_ERROR("Failed to listen on socket: %s", strerror(errno));
+         close(context->server_socket);
+         context->server_socket = -1;
+@@ -208,6 +231,8 @@
+     }
+     
+     LOG_INFO("TCP listener started on %s:%d", context->bind_address, context->port);
++    fprintf(stderr, "TCP listener: Listening on socket\n");
++    fflush(stderr);
+     
+     // Set running flag
+     context->running = true;
+@@ -219,6 +244,8 @@
+         context->running = false;
+         return STATUS_ERROR_THREAD;
+     }
++    fprintf(stderr, "TCP listener: Created accept thread\n");
++    fflush(stderr);
+     
+     return STATUS_SUCCESS;
+ }

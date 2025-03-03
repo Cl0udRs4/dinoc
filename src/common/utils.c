@@ -3,6 +3,8 @@
  * @brief Utility functions implementation for C2 server
  */
 
+#define _GNU_SOURCE /* For strdup and gethostname */
+
 #include "utils.h"
 #include "logger.h"
 #include <stdio.h>

@@ -3,6 +3,8 @@
  * @brief HTTP server implementation for C2 API
  */
 
+#define _GNU_SOURCE /* For strdup */
+
 #include "../include/api.h"
 #include "../include/common.h"
 #include "../include/task.h"
@@ -12,6 +14,10 @@
 #include <microhttpd.h>
 #include <jansson.h>
 #include <pthread.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 // HTTP server context
 typedef struct {
@@ -409,8 +415,8 @@ status_t http_server_parse_json_request(const char* upload_data, size_t upload_d
 /**
  * @brief Extract UUID from URL
  */
-status_t http_server_extract_uuid_from_url(const char* url, const char* prefix, uuid_t* uuid) {
-    if (url == NULL || prefix == NULL || uuid == NULL) {
+status_t http_server_extract_uuid_from_url(const char* url, const char* prefix, uuid_t uuid) {
+    if (url == NULL || prefix == NULL) {
         return STATUS_ERROR_INVALID_PARAM;
     }
     
@@ -424,5 +430,5 @@ status_t http_server_extract_uuid_from_url(const char* url, const char* prefix, 
     const char* uuid_str = url + prefix_len;
     
     // Parse UUID
-    return uuid_parse(uuid_str, uuid);
+    return uuid_from_string(uuid_str, uuid);
 }

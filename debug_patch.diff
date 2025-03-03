@@ -1,0 +1,60 @@
+--- a/src/server/server.c
++++ b/src/server/server.c
+@@ -106,6 +106,8 @@ status_t server_start(void) {
+     pthread_mutex_lock(&server_mutex);
+     
+     if (server_running) {
++        fprintf(stderr, "Server already running\n");
++        fflush(stderr);
+         pthread_mutex_unlock(&server_mutex);
+         return STATUS_ERROR_ALREADY_RUNNING;
+     }
+@@ -113,6 +115,8 @@ status_t server_start(void) {
+     // Create protocol listeners
+     status_t status;
+     protocol_listener_config_t listener_config;
++    fprintf(stderr, "Starting server initialization\n");
++    fflush(stderr);
+     
+     // TCP listener
+     if (server_config.enable_tcp) {
+@@ -120,9 +124,12 @@ status_t server_start(void) {
+         listener_config.bind_address = server_config.bind_address;
+         listener_config.port = server_config.tcp_port;
+         
++        fprintf(stderr, "Creating TCP listener on %s:%d\n", listener_config.bind_address, listener_config.port);
++        fflush(stderr);
+         status = protocol_manager_create_listener(PROTOCOL_TYPE_TCP, &listener_config, &tcp_listener);
+         if (status != STATUS_SUCCESS) {
+-            LOG_ERROR("Failed to create TCP listener: %d", status);
++            fprintf(stderr, "Failed to create TCP listener: %d\n", status);
++            fflush(stderr);
+             server_stop();
+             pthread_mutex_unlock(&server_mutex);
+             return status;
+@@ -130,7 +137,8 @@ status_t server_start(void) {
+         
+         status = protocol_manager_register_callbacks(tcp_listener, on_message_received, on_client_connected, on_client_disconnected);
+         if (status != STATUS_SUCCESS) {
+-            LOG_ERROR("Failed to register TCP listener callbacks: %d", status);
++            fprintf(stderr, "Failed to register TCP listener callbacks: %d\n", status);
++            fflush(stderr);
+             server_stop();
+             pthread_mutex_unlock(&server_mutex);
+             return status;
+@@ -138,14 +146,16 @@ status_t server_start(void) {
+         
+         status = protocol_manager_start_listener(tcp_listener);
+         if (status != STATUS_SUCCESS) {
+-            LOG_ERROR("Failed to start TCP listener: %d", status);
++            fprintf(stderr, "Failed to start TCP listener: %d\n", status);
++            fflush(stderr);
+             server_stop();
+             pthread_mutex_unlock(&server_mutex);
+             return status;
+         }
+         
+-        LOG_INFO("TCP listener started on port %d", server_config.tcp_port);
++        fprintf(stderr, "TCP listener started on port %d\n", server_config.tcp_port);
++        fflush(stderr);
+     }

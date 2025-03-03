@@ -1,0 +1,20 @@
+--- a/src/protocols/protocol_manager.c
++++ b/src/protocols/protocol_manager.c
+@@ -86,6 +86,8 @@ status_t protocol_manager_create_listener(protocol_type_t type, const protocol_l
+     if (global_manager == NULL) {
+         return STATUS_ERROR_NOT_FOUND;
+     }
++    printf("Protocol manager creating listener of type %d\n", type);
++    fflush(stdout);
+     
+     if (config == NULL || listener == NULL) {
+         return STATUS_ERROR_INVALID_PARAM;
+@@ -118,6 +120,8 @@ status_t protocol_manager_create_listener(protocol_type_t type, const protocol_l
+             return STATUS_ERROR_INVALID_PARAM;
+     }
+     
++    printf("Protocol listener creation status: %d\n", status);
++    fflush(stdout);
+     if (status != STATUS_SUCCESS) {
+         return status;
+     }

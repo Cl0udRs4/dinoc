@@ -1,0 +1,20 @@
+--- a/src/protocols/protocol_manager.c
++++ b/src/protocols/protocol_manager.c
+@@ -28,6 +28,8 @@ status_t protocol_manager_init(void) {
+     if (global_manager != NULL) {
+         return STATUS_ERROR_ALREADY_RUNNING;
+     }
++    printf("Initializing protocol manager\n");
++    fflush(stdout);
+     
+     global_manager = (protocol_manager_t*)malloc(sizeof(protocol_manager_t));
+     if (global_manager == NULL) {
+@@ -45,6 +47,8 @@ status_t protocol_manager_init(void) {
+     }
+     
+     pthread_mutex_init(&global_manager->mutex, NULL);
++    printf("Protocol manager initialized successfully\n");
++    fflush(stdout);
+     
+     return STATUS_SUCCESS;
+ }

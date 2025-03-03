@@ -34,6 +34,7 @@ static status_t fragmentation_add_fragment(fragment_tracker_t* tracker, uint8_t 
 static bool fragmentation_is_complete(fragment_tracker_t* tracker);
 static status_t fragmentation_reassemble(fragment_tracker_t* tracker, protocol_message_t* message);
 static status_t fragmentation_destroy_tracker(fragment_tracker_t* tracker);
+static uint16_t calculate_checksum(const uint8_t* data, size_t data_len);
 
 /**
  * @brief Initialize fragmentation system

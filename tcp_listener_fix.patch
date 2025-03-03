@@ -1,0 +1,11 @@
+--- src/protocols/tcp_listener.c
++++ src/protocols/tcp_listener.c.new
+@@ -394,7 +394,7 @@ static void* tcp_accept_thread(void* arg) {
+         }
+         
+         // Create client
+-        client_t* client = client_create();
++        client_t* client = client_register(NULL, NULL, NULL);
+         if (client == NULL) {
+             LOG_ERROR("Failed to create client");
+             close(client_socket);

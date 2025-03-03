@@ -7,6 +7,7 @@
 #include "../include/client.h"
 #include "../include/task.h"
 #include "../common/logger.h"
+#include "../common/uuid.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -74,7 +75,7 @@ status_t module_load(const char* name, const uint8_t* data, size_t data_len, mod
     memset(new_module, 0, sizeof(module_t));
     
     // Generate UUID
-    uuid_generate(new_module->id);
+    uuid_generate_compat(&new_module->id);
     
     // Set name
     new_module->name = strdup(name);
@@ -244,7 +245,7 @@ status_t module_get_commands(module_t* module, module_command_t*** commands, siz
     }
     
     // Get module commands function
-    typedef status_t (*get_commands_func_t)(module_command_t***, size_t*);
+    typedef status_t (*get_commands_func_t)(module_t*, module_command_t***, size_t*);
     get_commands_func_t func = (get_commands_func_t)dlsym(module->handle, "module_get_commands");
     
     if (func == NULL) {
@@ -252,7 +253,7 @@ status_t module_get_commands(module_t* module, module_command_t*** commands, siz
     }
     
     // Call function
-    return func(commands, count);
+    return func(module, commands, count);
 }
 
 /**
@@ -288,7 +289,7 @@ module_t* module_find_by_id(const uuid_t* id) {
     pthread_mutex_lock(&modules_mutex);
     
     for (size_t i = 0; i < modules_count; i++) {
-        if (uuid_compare(modules[i]->id, *id) == 0) {
+        if (uuid_compare_wrapper(modules[i]->id, *id) == 0) {
             pthread_mutex_unlock(&modules_mutex);
             return modules[i];
         }

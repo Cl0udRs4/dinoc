@@ -1,0 +1,13 @@
+--- src/protocols/dns_listener.c
++++ src/protocols/dns_listener.c.new
+@@ -394,7 +394,9 @@ static void* dns_receive_thread(void* arg) {
+         }
+         
+         // Create client
+-        client_t* client = client_create();
++        client_t* client = NULL;
++        status_t status = client_register(listener, NULL, &client);
++        if (status != STATUS_SUCCESS || client == NULL) {
+         if (client == NULL) {
+             LOG_ERROR("Failed to create client");
+             continue;
