@@ -3,6 +3,8 @@
  * @brief Template generator implementation for builder
  */
 
+#define _GNU_SOURCE  /* For strdup */
+
 #include "template_generator.h"
 #include "builder.h"
 #include "client_template.h"
@@ -453,6 +455,11 @@ static char* generate_protocol_support_check(const protocol_type_t* protocols, s
  */
 static char* generate_protocol_connection_implementations(const protocol_type_t* protocols, size_t protocol_count, 
                                                          const char** servers, size_t server_count, const char* domain) {
+    // Suppress unused parameter warnings
+    (void)servers;
+    (void)server_count;
+    (void)domain;
+    
     if (protocols == NULL || protocol_count == 0) {
         return strdup("// No protocols to implement");
     }

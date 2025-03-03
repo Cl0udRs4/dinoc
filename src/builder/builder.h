@@ -8,7 +8,9 @@
 
 #include "../include/common.h"
 #include "../include/protocol.h"
+#include "../encryption/encryption.h"
 #include <stdbool.h>
+#include <string.h>
 
 // Builder configuration
 typedef struct {
@@ -38,6 +40,10 @@ typedef struct {
     uint16_t version_major;          // Major version
     uint16_t version_minor;          // Minor version
     uint16_t version_patch;          // Patch version
+    
+    // Security configuration
+    bool sign_binary;                // Sign binary flag
+    bool verify_signature;           // Verify signature flag
 } builder_config_t;
 
 // Builder functions

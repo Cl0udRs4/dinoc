@@ -3,6 +3,8 @@
  * @brief Builder tool implementation for generating customized C2 clients
  */
 
+#define _GNU_SOURCE  /* For strdup */
+
 #include "builder.h"
 #include "template_generator.h"
 #include "../include/common.h"
@@ -12,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <strings.h>
 
 // Default values
 #define DEFAULT_OUTPUT_FILE "client"
@@ -80,6 +83,8 @@ status_t builder_parse_args(int argc, char** argv, builder_config_t* config) {
     config->version_major = DEFAULT_VERSION_MAJOR;
     config->version_minor = DEFAULT_VERSION_MINOR;
     config->version_patch = DEFAULT_VERSION_PATCH;
+    config->sign_binary = true;      // Sign binary by default
+    config->verify_signature = true; // Verify signature by default
     
     if (config->output_file == NULL) {
         return STATUS_ERROR_MEMORY;

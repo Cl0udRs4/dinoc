@@ -3,6 +3,8 @@
  * @brief Client template implementation for builder to generate customized clients
  */
 
+#define _GNU_SOURCE  /* For strdup */
+
 #include "client_template.h"
 #include "../include/common.h"
 #include "../include/protocol.h"
@@ -364,6 +366,9 @@ status_t client_template_load_module(const char* module_name) {
         return STATUS_ERROR_NOT_INITIALIZED;
     }
     
+    // Suppress unused parameter warning
+    (void)module_name;
+    
     // TODO: Implement module loading
     // This is a placeholder for the actual implementation
     
@@ -378,6 +383,9 @@ status_t client_template_unload_module(const char* module_name) {
     if (!client_initialized) {
         return STATUS_ERROR_NOT_INITIALIZED;
     }
+    
+    // Suppress unused parameter warning
+    (void)module_name;
     
     // TODO: Implement module unloading
     // This is a placeholder for the actual implementation
@@ -399,6 +407,11 @@ status_t client_template_execute_module(const char* module_name, const uint8_t* 
         return STATUS_ERROR_NOT_CONNECTED;
     }
     
+    // Suppress unused parameter warnings
+    (void)module_name;
+    (void)data;
+    (void)data_len;
+    
     // TODO: Implement module execution
     // This is a placeholder for the actual implementation
     
@@ -409,6 +422,9 @@ status_t client_template_execute_module(const char* module_name, const uint8_t* 
  * @brief Connect with a specific protocol
  */
 static status_t client_connect_with_protocol(protocol_type_t protocol_type) {
+    // Suppress unused parameter warning
+    (void)protocol_type;
+    
     // TODO: Implement protocol-specific connection
     // This is a placeholder for the actual implementation
     
@@ -423,6 +439,9 @@ static status_t client_connect_with_protocol(protocol_type_t protocol_type) {
  * @brief Heartbeat thread function
  */
 static void* client_heartbeat_thread(void* arg) {
+    // Suppress unused parameter warning
+    (void)arg;
+    
     struct timespec ts;
     
     while (true) {
