@@ -8,7 +8,7 @@ LDFLAGS = -lpthread -lcrypto -lssl -lm -lz
 COMMON_OBJS = ../common/logger.o ../common/uuid.o ../common/utils.o ../common/config.o ../client/client.o
 
 # Protocol objects
-PROTOCOL_OBJS = ../protocols/protocol_header.o ../protocols/protocol_handler.o ../protocols/protocol_manager.o
+PROTOCOL_OBJS = ../protocols/protocol_header.o ../protocols/protocol_handler.o ../protocols/protocol_manager.o ../protocols/protocol_stubs.o
 
 # Encryption objects
 ENCRYPTION_OBJS = ../encryption/encryption.o ../encryption/aes.o ../encryption/chacha20.o
