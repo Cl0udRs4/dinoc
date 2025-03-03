@@ -1,6 +1,6 @@
 /**
- * @file test_icmp_listener.c
- * @brief Test program for ICMP protocol listener
+ * @file test_udp_listener.c
+ * @brief Test program for UDP protocol listener
  */
 
 #include "../include/protocol.h"
@@ -12,14 +12,14 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
-#include <arpa/inet.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/ip.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 // Test configuration
-#define TEST_PCAP_DEVICE "any"
-#define TEST_MESSAGE "Hello, ICMP!"
+#define TEST_BIND_ADDRESS "127.0.0.1"
+#define TEST_PORT 8081
+#define TEST_MESSAGE "Hello, UDP!"
 #define TEST_TIMEOUT_MS 5000
 
 // Global variables
@@ -35,7 +35,6 @@ static void on_client_connected(protocol_listener_t* listener, client_t* client)
 static void on_client_disconnected(protocol_listener_t* listener, client_t* client);
 static void* client_thread(void* arg);
 static void cleanup(void);
-static uint16_t calculate_checksum(uint16_t* addr, int len);
 
 /**
  * @brief Signal handler
@@ -58,23 +57,24 @@ static void cleanup(void) {
 }
 
 /**
- * @brief Test ICMP listener creation
+ * @brief Test UDP listener creation
  */
-static void test_icmp_listener_create(void) {
-    printf("Testing ICMP listener creation...\n");
+static void test_udp_listener_create(void) {
+    printf("Testing UDP listener creation...\n");
     
     // Create listener configuration
     protocol_listener_config_t config;
     memset(&config, 0, sizeof(config));
     
-    config.pcap_device = TEST_PCAP_DEVICE;
+    config.bind_address = TEST_BIND_ADDRESS;
+    config.port = TEST_PORT;
     config.timeout_ms = TEST_TIMEOUT_MS;
     
     // Create listener
-    status_t status = icmp_listener_create(&config, &listener);
+    status_t status = udp_listener_create(&config, &listener);
     
     if (status != STATUS_SUCCESS) {
-        printf("Failed to create ICMP listener: %d\n", status);
+        printf("Failed to create UDP listener: %d\n", status);
         exit(1);
     }
     
@@ -87,25 +87,25 @@ static void test_icmp_listener_create(void) {
         exit(1);
     }
     
-    printf("ICMP listener created successfully\n");
+    printf("UDP listener created successfully\n");
 }
 
 /**
- * @brief Test ICMP listener start and stop
+ * @brief Test UDP listener start and stop
  */
-static void test_icmp_listener_start_stop(void) {
-    printf("Testing ICMP listener start and stop...\n");
+static void test_udp_listener_start_stop(void) {
+    printf("Testing UDP listener start and stop...\n");
     
     // Start listener
     status_t status = listener->start(listener);
     
     if (status != STATUS_SUCCESS) {
-        printf("Failed to start ICMP listener: %d\n", status);
+        printf("Failed to start UDP listener: %d\n", status);
         listener->destroy(listener);
         exit(1);
     }
     
-    printf("ICMP listener started successfully\n");
+    printf("UDP listener started successfully\n");
     
     // Sleep for a bit
     sleep(1);
@@ -114,30 +114,30 @@ static void test_icmp_listener_start_stop(void) {
     status = listener->stop(listener);
     
     if (status != STATUS_SUCCESS) {
-        printf("Failed to stop ICMP listener: %d\n", status);
+        printf("Failed to stop UDP listener: %d\n", status);
         listener->destroy(listener);
         exit(1);
     }
     
-    printf("ICMP listener stopped successfully\n");
+    printf("UDP listener stopped successfully\n");
     
     // Start listener again for message test
     status = listener->start(listener);
     
     if (status != STATUS_SUCCESS) {
-        printf("Failed to restart ICMP listener: %d\n", status);
+        printf("Failed to restart UDP listener: %d\n", status);
         listener->destroy(listener);
         exit(1);
     }
     
-    printf("ICMP listener restarted successfully\n");
+    printf("UDP listener restarted successfully\n");
 }
 
 /**
- * @brief Test ICMP message sending and receiving
+ * @brief Test UDP message sending and receiving
  */
-static void test_icmp_message_send_receive(void) {
-    printf("Testing ICMP message sending and receiving...\n");
+static void test_udp_message_send_receive(void) {
+    printf("Testing UDP message sending and receiving...\n");
     
     // Create client thread
     pthread_t thread;
@@ -171,7 +171,7 @@ static void test_icmp_message_send_receive(void) {
     // Wait for client thread to exit
     pthread_join(thread, NULL);
     
-    printf("ICMP message test completed successfully\n");
+    printf("UDP message test completed successfully\n");
 }
 
 /**
@@ -181,19 +181,11 @@ static void* client_thread(void* arg) {
     // Sleep for a bit to allow server to start
     sleep(1);
     
-    // Create raw socket
-    int sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    // Create socket
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
     
     if (sock < 0) {
         perror("socket");
-        return NULL;
-    }
-    
-    // Set socket options
-    int on = 1;
-    if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0) {
-        perror("setsockopt");
-        close(sock);
         return NULL;
     }
     
@@ -201,124 +193,51 @@ static void* client_thread(void* arg) {
     struct timeval tv;
     tv.tv_sec = 5;
     tv.tv_usec = 0;
+    
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-        perror("setsockopt (SO_RCVTIMEO)");
+        perror("setsockopt");
         close(sock);
         return NULL;
     }
     
-    // Prepare destination address
-    struct sockaddr_in dest_addr;
-    memset(&dest_addr, 0, sizeof(dest_addr));
-    dest_addr.sin_family = AF_INET;
-    dest_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    // Prepare server address
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = inet_addr(TEST_BIND_ADDRESS);
+    server_addr.sin_port = htons(TEST_PORT);
     
-    // Prepare ICMP packet
-    char packet[sizeof(struct iphdr) + sizeof(struct icmphdr) + strlen(TEST_MESSAGE)];
-    memset(packet, 0, sizeof(packet));
-    
-    // IP header
-    struct iphdr* ip = (struct iphdr*)packet;
-    ip->version = 4;
-    ip->ihl = 5;
-    ip->tos = 0;
-    ip->tot_len = htons(sizeof(packet));
-    ip->id = htons(getpid());
-    ip->frag_off = 0;
-    ip->ttl = 64;
-    ip->protocol = IPPROTO_ICMP;
-    ip->check = 0;
-    ip->saddr = inet_addr("127.0.0.1");
-    ip->daddr = dest_addr.sin_addr.s_addr;
-    
-    // ICMP header
-    struct icmphdr* icmp = (struct icmphdr*)(packet + sizeof(struct iphdr));
-    icmp->type = ICMP_ECHO;
-    icmp->code = 0;
-    icmp->un.echo.id = htons(getpid());
-    icmp->un.echo.sequence = htons(1);
-    icmp->checksum = 0;
-    
-    // ICMP data
-    char* data = packet + sizeof(struct iphdr) + sizeof(struct icmphdr);
-    strcpy(data, TEST_MESSAGE);
-    
-    // Calculate ICMP checksum
-    icmp->checksum = calculate_checksum((uint16_t*)icmp, sizeof(struct icmphdr) + strlen(TEST_MESSAGE));
-    
-    // Send packet
-    if (sendto(sock, packet, sizeof(packet), 0, (struct sockaddr*)&dest_addr, sizeof(dest_addr)) < 0) {
+    // Send message
+    if (sendto(sock, TEST_MESSAGE, strlen(TEST_MESSAGE), 0, 
+              (struct sockaddr*)&server_addr, sizeof(server_addr)) != strlen(TEST_MESSAGE)) {
         perror("sendto");
         close(sock);
         return NULL;
     }
     
-    printf("ICMP packet sent\n");
+    printf("Message sent: %s\n", TEST_MESSAGE);
     
     // Receive response
-    char recv_buffer[1024];
-    struct sockaddr_in recv_addr;
-    socklen_t recv_addr_len = sizeof(recv_addr);
+    char buffer[1024];
+    struct sockaddr_in from_addr;
+    socklen_t from_addr_len = sizeof(from_addr);
     
-    time_t start_time = time(NULL);
-    while (time(NULL) - start_time < 5 && !message_received) {
-        int recv_len = recvfrom(sock, recv_buffer, sizeof(recv_buffer), 0, 
-                               (struct sockaddr*)&recv_addr, &recv_addr_len);
-        
-        if (recv_len > 0) {
-            printf("Received ICMP response\n");
-            
-            // Process ICMP response
-            struct iphdr* ip_reply = (struct iphdr*)recv_buffer;
-            struct icmphdr* icmp_reply = (struct icmphdr*)(recv_buffer + ip_reply->ihl * 4);
-            
-            // Check if this is an ICMP echo reply
-            if (icmp_reply->type == ICMP_ECHOREPLY) {
-                // Extract data
-                char* data = recv_buffer + ip_reply->ihl * 4 + sizeof(struct icmphdr);
-                size_t data_len = recv_len - ip_reply->ihl * 4 - sizeof(struct icmphdr);
-                
-                printf("ICMP echo reply received: %.*s\n", (int)data_len, data);
-            }
-        } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            perror("recvfrom");
-            break;
-        }
-        
-        // Small delay
-        usleep(100000);
+    ssize_t recv_len = recvfrom(sock, buffer, sizeof(buffer) - 1, 0, 
+                               (struct sockaddr*)&from_addr, &from_addr_len);
+    
+    if (recv_len < 0) {
+        perror("recvfrom");
+        close(sock);
+        return NULL;
     }
+    
+    buffer[recv_len] = '\0';
+    printf("Response received: %s\n", buffer);
     
     // Close socket
     close(sock);
     
     return NULL;
-}
-
-/**
- * @brief Calculate IP checksum
- */
-static uint16_t calculate_checksum(uint16_t* addr, int len) {
-    int nleft = len;
-    int sum = 0;
-    uint16_t* w = addr;
-    uint16_t answer = 0;
-    
-    while (nleft > 1) {
-        sum += *w++;
-        nleft -= 2;
-    }
-    
-    if (nleft == 1) {
-        *(uint8_t*)(&answer) = *(uint8_t*)w;
-        sum += answer;
-    }
-    
-    sum = (sum >> 16) + (sum & 0xFFFF);
-    sum += (sum >> 16);
-    answer = ~sum;
-    
-    return answer;
 }
 
 /**
@@ -375,9 +294,9 @@ int main(int argc, char** argv) {
     }
     
     // Run tests
-    test_icmp_listener_create();
-    test_icmp_listener_start_stop();
-    test_icmp_message_send_receive();
+    test_udp_listener_create();
+    test_udp_listener_start_stop();
+    test_udp_message_send_receive();
     
     // Clean up
     cleanup();

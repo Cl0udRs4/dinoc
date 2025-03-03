@@ -102,6 +102,67 @@ status_t fragmentation_shutdown(void) {
 }
 
 /**
+ * @brief Compress data using simple RLE compression
+ */
+static status_t compress_data(const uint8_t* data, size_t data_len, 
+                            uint8_t** compressed_data, size_t* compressed_len) {
+    if (data == NULL || compressed_data == NULL || compressed_len == NULL) {
+        return STATUS_ERROR_INVALID_PARAM;
+    }
+    
+    // Allocate worst-case buffer (input size + potential overhead)
+    *compressed_data = (uint8_t*)malloc(data_len * 2);
+    if (*compressed_data == NULL) {
+        return STATUS_ERROR_MEMORY;
+    }
+    
+    size_t out_pos = 0;
+    size_t in_pos = 0;
+    
+    while (in_pos < data_len) {
+        // Find run length
+        uint8_t run_byte = data[in_pos];
+        size_t run_start = in_pos;
+        
+        while (in_pos < data_len && data[in_pos] == run_byte && (in_pos - run_start) < 255) {
+            in_pos++;
+        }
+        
+        size_t run_length = in_pos - run_start;
+        
+        if (run_length >= 4) {
+            // Encode run
+            (*compressed_data)[out_pos++] = 0; // Marker for RLE
+            (*compressed_data)[out_pos++] = (uint8_t)run_length;
+            (*compressed_data)[out_pos++] = run_byte;
+        } else {
+            // Copy literals
+            for (size_t i = 0; i < run_length; i++) {
+                (*compressed_data)[out_pos++] = run_byte;
+            }
+        }
+    }
+    
+    *compressed_len = out_pos;
+    
+    // If compression didn't help, free the buffer and return error
+    if (*compressed_len >= data_len) {
+        free(*compressed_data);
+        *compressed_data = NULL;
+        *compressed_len = 0;
+        return STATUS_ERROR_COMPRESSION;
+    }
+    
+    // Resize buffer to actual compressed size
+    uint8_t* resized = (uint8_t*)realloc(*compressed_data, *compressed_len);
+    if (resized != NULL) {
+        *compressed_data = resized;
+    }
+    
+    return STATUS_SUCCESS;
+}
+
+/**
  * @brief Send a fragmented message
  */
 status_t fragmentation_send_message(protocol_listener_t* listener, client_t* client,
@@ -111,9 +172,29 @@ status_t fragmentation_send_message(protocol_listener_t* listener, client_t* cli
         return STATUS_ERROR_INVALID_PARAM;
     }
     
+    // Try to compress data if it's large enough
+    uint8_t* compressed_data = NULL;
+    size_t compressed_len = 0;
+    bool is_compressed = false;
+    const uint8_t* send_data = data;
+    size_t send_len = data_len;
+    uint8_t flags = FRAGMENT_FLAG_NONE;
+    
+    if (data_len > 1024) { // Only compress data larger than 1KB
+        if (compress_data(data, data_len, &compressed_data, &compressed_len) == STATUS_SUCCESS) {
+            send_data = compressed_data;
+            send_len = compressed_len;
+            is_compressed = true;
+            flags |= FRAGMENT_FLAG_COMPRESSED;
+        }
+    }
+    
     // Calculate number of fragments needed
-    uint8_t total_fragments = (data_len + max_fragment_size - 1) / max_fragment_size;
+    uint8_t total_fragments = (send_len + max_fragment_size - 1) / max_fragment_size;
     if (total_fragments > 255) {
+        if (is_compressed) {
+            free(compressed_data);
+        }
         return STATUS_ERROR_INVALID_PARAM;
     }
     
@@ -121,25 +202,34 @@ status_t fragmentation_send_message(protocol_listener_t* listener, client_t* cli
     uint16_t fragment_id = (uint16_t)rand();
     
     // Send each fragment
+    status_t final_status = STATUS_SUCCESS;
+    
     for (uint8_t i = 0; i < total_fragments; i++) {
         // Calculate fragment size
         size_t offset = i * max_fragment_size;
-        size_t fragment_size = (i == total_fragments - 1) ? (data_len - offset) : max_fragment_size;
+        size_t fragment_size = (i == total_fragments - 1) ? (send_len - offset) : max_fragment_size;
         
         // Create fragment header
         fragment_header_t header;
-        fragmentation_create_header(fragment_id, i, total_fragments, 0, &header);
+        fragmentation_create_header(fragment_id, i, total_fragments, flags, &header);
         
         // Create fragment message
         size_t message_size = sizeof(fragment_header_t) + fragment_size;
         uint8_t* message = (uint8_t*)malloc(message_size);
         if (message == NULL) {
+            if (is_compressed) {
+                free(compressed_data);
+            }
             return STATUS_ERROR_MEMORY;
         }
         
         // Copy header and data
         memcpy(message, &header, sizeof(fragment_header_t));
-        memcpy(message + sizeof(fragment_header_t), data + offset, fragment_size);
+        memcpy(message + sizeof(fragment_header_t), send_data + offset, fragment_size);
+        
+        // Calculate and set checksum
+        header.checksum = calculate_checksum(message, message_size);
+        memcpy(message, &header, sizeof(fragment_header_t));
         
         // Send fragment
         protocol_message_t fragment_message;
@@ -156,10 +246,73 @@ status_t fragmentation_send_message(protocol_listener_t* listener, client_t* cli
         free(message);
         
         if (status != STATUS_SUCCESS) {
-            return status;
+            final_status = status;
+            break;
         }
     }
     
+    // Clean up compressed data if used
+    if (is_compressed) {
+        free(compressed_data);
+    }
+    
+    return final_status;
+}
+
+/**
+ * @brief Decompress data using simple RLE decompression
+ */
+static status_t decompress_data(const uint8_t* compressed_data, size_t compressed_len,
+                              uint8_t** decompressed_data, size_t* decompressed_len) {
+    if (compressed_data == NULL || decompressed_data == NULL || decompressed_len == NULL) {
+        return STATUS_ERROR_INVALID_PARAM;
+    }
+    
+    // First pass to determine decompressed size
+    size_t out_size = 0;
+    size_t in_pos = 0;
+    
+    while (in_pos < compressed_len) {
+        if (compressed_data[in_pos] == 0 && in_pos + 2 < compressed_len) {
+            // RLE marker found
+            uint8_t run_length = compressed_data[in_pos + 1];
+            out_size += run_length;
+            in_pos += 3;
+        } else {
+            // Literal byte
+            out_size++;
+            in_pos++;
+        }
+    }
+    
+    // Allocate output buffer
+    *decompressed_data = (uint8_t*)malloc(out_size);
+    if (*decompressed_data == NULL) {
+        return STATUS_ERROR_MEMORY;
+    }
+    
+    // Second pass to decompress
+    in_pos = 0;
+    size_t out_pos = 0;
+    
+    while (in_pos < compressed_len) {
+        if (compressed_data[in_pos] == 0 && in_pos + 2 < compressed_len) {
+            // RLE marker found
+            uint8_t run_length = compressed_data[in_pos + 1];
+            uint8_t run_byte = compressed_data[in_pos + 2];
+            
+            for (uint8_t i = 0; i < run_length; i++) {
+                (*decompressed_data)[out_pos++] = run_byte;
+            }
+            
+            in_pos += 3;
+        } else {
+            // Literal byte
+            (*decompressed_data)[out_pos++] = compressed_data[in_pos++];
+        }
+    }
+    
+    *decompressed_len = out_size;
     return STATUS_SUCCESS;
 }
 
@@ -228,6 +381,42 @@ status_t fragmentation_process_fragment(protocol_listener_t* listener, client_t*
         status = fragmentation_reassemble(tracker, &message);
         
         if (status == STATUS_SUCCESS) {
+            // Check if message is compressed
+            if (header.flags & FRAGMENT_FLAG_COMPRESSED) {
+                // Decompress message
+                uint8_t* decompressed_data = NULL;
+                size_t decompressed_len = 0;
+                
+                status = decompress_data(message.data, message.data_len, 
+                                       &decompressed_data, &decompressed_len);
+                
+                if (status == STATUS_SUCCESS) {
+                    // Free original message data
+                    free(message.data);
+                    
+                    // Update message with decompressed data
+                    message.data = decompressed_data;
+                    message.data_len = decompressed_len;
+                } else {
+                    // Decompression failed, free message data
+                    free(message.data);
+                    pthread_mutex_unlock(&global_manager->mutex);
+                    
+                    // Remove tracker from manager
+                    for (size_t i = 0; i < global_manager->tracker_count; i++) {
+                        if (global_manager->trackers[i] == tracker) {
+                            global_manager->trackers[i] = global_manager->trackers[--global_manager->tracker_count];
+                            break;
+                        }
+                    }
+                    
+                    // Destroy tracker
+                    fragmentation_destroy_tracker(tracker);
+                    
+                    return status;
+                }
+            }
+            
             // Call callback
             callback(listener, client, &message);
             
@@ -253,6 +442,33 @@ status_t fragmentation_process_fragment(protocol_listener_t* listener, client_t*
 }
 
 /**
+ * @brief Calculate checksum for data
+ */
+static uint16_t calculate_checksum(const uint8_t* data, size_t data_len) {
+    uint32_t sum = 0;
+    
+    // Process data in 16-bit chunks
+    const uint16_t* data16 = (const uint16_t*)data;
+    size_t len16 = data_len / 2;
+    
+    for (size_t i = 0; i < len16; i++) {
+        sum += data16[i];
+    }
+    
+    // Handle odd byte if present
+    if (data_len % 2) {
+        sum += data[data_len - 1];
+    }
+    
+    // Fold 32-bit sum to 16 bits
+    while (sum >> 16) {
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+    
+    return (uint16_t)~sum;
+}
+
+/**
  * @brief Create a fragment header
  */
 status_t fragmentation_create_header(uint16_t fragment_id, uint8_t fragment_index,
@@ -266,6 +482,7 @@ status_t fragmentation_create_header(uint16_t fragment_id, uint8_t fragment_inde
     header->fragment_index = fragment_index;
     header->total_fragments = total_fragments;
     header->flags = flags;
+    header->checksum = 0; // Will be calculated later when data is available
     
     return STATUS_SUCCESS;
 }
@@ -280,6 +497,23 @@ status_t fragmentation_parse_header(const uint8_t* data, size_t data_len,
     }
     
     memcpy(header, data, sizeof(fragment_header_t));
+    
+    // Verify checksum if present
+    if (header->checksum != 0) {
+        uint16_t original_checksum = header->checksum;
+        header->checksum = 0;
+        
+        // Calculate checksum for the header and data
+        uint16_t calculated_checksum = calculate_checksum(data, data_len);
+        
+        // Restore original checksum
+        header->checksum = original_checksum;
+        
+        // Compare checksums
+        if (original_checksum != calculated_checksum) {
+            return STATUS_ERROR_CHECKSUM;
+        }
+    }
     
     return STATUS_SUCCESS;
 }
