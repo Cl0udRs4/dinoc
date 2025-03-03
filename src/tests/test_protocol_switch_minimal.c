@@ -3,27 +3,14 @@
  * @brief Minimal test for protocol switching functionality
  */
 
-#include "../protocols/protocol_switch.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-// Define the necessary types and constants if not included
-#ifndef STATUS_SUCCESS
-#define STATUS_SUCCESS 0
-#endif
-
-#ifndef PROTOCOL_TYPE_TCP
-typedef enum {
-    PROTOCOL_TYPE_TCP = 0,
-    PROTOCOL_TYPE_UDP = 1,
-    PROTOCOL_TYPE_WS = 2,
-    PROTOCOL_TYPE_ICMP = 3,
-    PROTOCOL_TYPE_DNS = 4
-} protocol_type_t;
-#endif
+// Include the minimal protocol switch implementation
+#include "protocol_switch_minimal.c"
 
 int main(void) {
     printf("Testing protocol switch message creation...\n");
@@ -44,6 +31,31 @@ int main(void) {
         return 1;
     }
     
+    if (message.protocol != PROTOCOL_TYPE_TCP) {
+        printf("Protocol switch message protocol is incorrect: %d\n", message.protocol);
+        return 1;
+    }
+    
+    if (message.port != 8080) {
+        printf("Protocol switch message port is incorrect: %d\n", message.port);
+        return 1;
+    }
+    
+    if (message.timeout_ms != 5000) {
+        printf("Protocol switch message timeout is incorrect: %d\n", message.timeout_ms);
+        return 1;
+    }
+    
+    if (message.flags != PROTOCOL_SWITCH_FLAG_IMMEDIATE) {
+        printf("Protocol switch message flags are incorrect: 0x%02x\n", message.flags);
+        return 1;
+    }
+    
+    if (strcmp(message.domain, "example.com") != 0) {
+        printf("Protocol switch message domain is incorrect: %s\n", message.domain);
+        return 1;
+    }
+    
     printf("Protocol switch message creation test passed\n");
     
     printf("Testing protocol switch message detection...\n");
@@ -52,6 +64,16 @@ int main(void) {
     bool is_message = protocol_switch_is_message((const uint8_t*)&message, sizeof(message));
     if (!is_message) {
         printf("Protocol switch message not detected\n");
+        return 1;
+    }
+    
+    // Modify magic number
+    message.magic = 0x12345678;
+    
+    // Check if message is not detected
+    is_message = protocol_switch_is_message((const uint8_t*)&message, sizeof(message));
+    if (is_message) {
+        printf("Invalid protocol switch message detected\n");
         return 1;
     }
     
