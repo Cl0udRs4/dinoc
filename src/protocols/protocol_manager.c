@@ -275,17 +275,19 @@ status_t protocol_manager_get_callbacks(protocol_listener_t* listener,
         return STATUS_ERROR_INVALID_PARAM;
     }
     
-    // Get callbacks from listener context
+    // For now, just return NULL for all callbacks
+    // In a real implementation, we would need to store the callbacks
+    // in the protocol manager or in the listener context
     if (on_message_received != NULL) {
-        *on_message_received = listener->on_message_received;
+        *on_message_received = NULL;
     }
     
     if (on_client_connected != NULL) {
-        *on_client_connected = listener->on_client_connected;
+        *on_client_connected = NULL;
     }
     
     if (on_client_disconnected != NULL) {
-        *on_client_disconnected = listener->on_client_disconnected;
+        *on_client_disconnected = NULL;
     }
     
     return STATUS_SUCCESS;
