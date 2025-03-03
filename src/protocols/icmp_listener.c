@@ -21,6 +21,9 @@
 #include <errno.h>
 #include <time.h>
 
+// Heartbeat magic number
+#define HEARTBEAT_MAGIC 0x48454152  // "HEAR"
+
 // ICMP protocol constants
 #define ICMP_ECHO_REQUEST 8
 #define ICMP_ECHO_REPLY 0
@@ -112,9 +115,22 @@ static void icmp_packet_handler(u_char* user, const struct pcap_pkthdr* pkthdr, 
     message.data = packet_data;
     message.data_len = data_len;
     
-    // Call message received callback
-    if (ctx->on_message_received != NULL) {
-        ctx->on_message_received(listener, client, &message);
+    // Check if this is a heartbeat message
+    if (message.data_len == sizeof(uint32_t) && 
+        *((uint32_t*)message.data) == HEARTBEAT_MAGIC) {
+        // Process heartbeat
+        client_heartbeat(client);
+        
+        // Update client state if needed
+        if (client->state == CLIENT_STATE_CONNECTED || 
+            client->state == CLIENT_STATE_REGISTERED) {
+            client_update_state(client, CLIENT_STATE_ACTIVE);
+        }
+    } else {
+        // Call message received callback
+        if (ctx->on_message_received != NULL) {
+            ctx->on_message_received(listener, client, &message);
+        }
     }
 }
 
@@ -132,26 +148,42 @@ static client_t* icmp_find_or_create_client(icmp_listener_ctx_t* ctx, const char
     
     // Find client by IP address
     for (size_t i = 0; i < ctx->client_count; i++) {
-        if (strcmp(ctx->clients[i]->address, ip_address) == 0) {
-            client = ctx->clients[i];
-            break;
+        if (ctx->clients[i]->protocol_context != NULL) {
+            char* client_ip = (char*)ctx->clients[i]->protocol_context;
+            if (strcmp(client_ip, ip_address) == 0) {
+                client = ctx->clients[i];
+                break;
+            }
         }
     }
     
+    pthread_mutex_unlock(&ctx->clients_mutex);
+    
     // Create new client if not found
     if (client == NULL) {
-        client = (client_t*)malloc(sizeof(client_t));
-        if (client == NULL) {
-            pthread_mutex_unlock(&ctx->clients_mutex);
+        // Create protocol context (IP address)
+        void* protocol_context = strdup(ip_address);
+        if (protocol_context == NULL) {
             return NULL;
         }
         
-        // Initialize client
-        memset(client, 0, sizeof(client_t));
-        uuid_generate(&client->id);
-        client->connection_time = time(NULL);
-        client->last_seen_time = client->connection_time;
-        strncpy(client->address, ip_address, sizeof(client->address) - 1);
+        // Register client
+        protocol_listener_t* listener = (protocol_listener_t*)ctx;
+        status_t status = client_register(listener, protocol_context, &client);
+        
+        if (status != STATUS_SUCCESS) {
+            free(protocol_context);
+            return NULL;
+        }
+        
+        // Update client state
+        client_update_state(client, CLIENT_STATE_CONNECTED);
+        
+        // Update client information
+        client_update_info(client, NULL, ip_address, NULL);
+        
+        // Add client to array
+        pthread_mutex_lock(&ctx->clients_mutex);
         
         // Resize clients array if needed
         if (ctx->client_count >= ctx->client_capacity) {
@@ -160,8 +192,7 @@ static client_t* icmp_find_or_create_client(icmp_listener_ctx_t* ctx, const char
             
             if (new_clients == NULL) {
                 pthread_mutex_unlock(&ctx->clients_mutex);
-                free(client);
-                return NULL;
+                return client;  // Still return the client, just don't add to array
             }
             
             ctx->clients = new_clients;
@@ -169,14 +200,13 @@ static client_t* icmp_find_or_create_client(icmp_listener_ctx_t* ctx, const char
         }
         
         ctx->clients[ctx->client_count++] = client;
+        pthread_mutex_unlock(&ctx->clients_mutex);
         
         // Call client connected callback
         if (ctx->on_client_connected != NULL) {
-            ctx->on_client_connected((protocol_listener_t*)ctx, client);
+            ctx->on_client_connected(listener, client);
         }
     }
-    
-    pthread_mutex_unlock(&ctx->clients_mutex);
     
     return client;
 }
@@ -412,6 +442,29 @@ static status_t icmp_listener_stop(protocol_listener_t* listener) {
         close(ctx->raw_socket);
         ctx->raw_socket = -1;
     }
+    
+    // Update client states and free protocol contexts
+    pthread_mutex_lock(&ctx->clients_mutex);
+    
+    for (size_t i = 0; i < ctx->client_count; i++) {
+        client_t* client = ctx->clients[i];
+        
+        // Update client state
+        client_update_state(client, CLIENT_STATE_DISCONNECTED);
+        
+        // Call client disconnected callback
+        if (ctx->on_client_disconnected != NULL) {
+            ctx->on_client_disconnected(listener, client);
+        }
+        
+        // Free protocol context
+        if (client->protocol_context != NULL) {
+            free(client->protocol_context);
+            client->protocol_context = NULL;
+        }
+    }
+    
+    pthread_mutex_unlock(&ctx->clients_mutex);
     
     return STATUS_SUCCESS;
 }

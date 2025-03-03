@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <uuid/uuid.h>
 
 // Status codes
 typedef enum {
@@ -24,13 +25,11 @@ typedef enum {
     STATUS_ERROR_NOT_INITIALIZED = -9,
     STATUS_ERROR_KEY_EXPIRED = -10,
     STATUS_ERROR_CHECKSUM = -11,
-    STATUS_ERROR_COMPRESSION = -12
+    STATUS_ERROR_COMPRESSION = -12,
+    STATUS_ERROR_NOT_CONNECTED = -13
 } status_t;
 
-// Client structure
-typedef struct client {
-    uint32_t id;
-    void* data;
-} client_t;
+// Forward declarations
+typedef struct client client_t;
 
 #endif /* DINOC_COMMON_H */

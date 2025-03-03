@@ -73,6 +73,11 @@ status_t protocol_manager_register_callbacks(protocol_listener_t* listener,
                                            void (*on_client_connected)(protocol_listener_t*, client_t*),
                                            void (*on_client_disconnected)(protocol_listener_t*, client_t*));
 
+status_t protocol_manager_get_callbacks(protocol_listener_t* listener,
+                                      void (**on_message_received)(protocol_listener_t*, client_t*, protocol_message_t*),
+                                      void (**on_client_connected)(protocol_listener_t*, client_t*),
+                                      void (**on_client_disconnected)(protocol_listener_t*, client_t*));
+
 // Protocol listener creation functions
 status_t tcp_listener_create(const protocol_listener_config_t* config, protocol_listener_t** listener);
 status_t udp_listener_create(const protocol_listener_config_t* config, protocol_listener_t** listener);

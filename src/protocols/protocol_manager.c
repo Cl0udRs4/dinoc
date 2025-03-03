@@ -27,7 +27,7 @@ static protocol_manager_t* global_manager = NULL;
  */
 status_t protocol_manager_init(void) {
     if (global_manager != NULL) {
-        return STATUS_ERROR_ALREADY_EXISTS;
+        return STATUS_ERROR_ALREADY_RUNNING;
     }
     
     global_manager = (protocol_manager_t*)malloc(sizeof(protocol_manager_t));
@@ -258,4 +258,37 @@ status_t protocol_manager_register_callbacks(protocol_listener_t* listener,
     }
     
     return listener->register_callbacks(listener, on_message_received, on_client_connected, on_client_disconnected);
+}
+
+/**
+ * @brief Get callbacks from a protocol listener
+ */
+status_t protocol_manager_get_callbacks(protocol_listener_t* listener,
+                                      void (**on_message_received)(protocol_listener_t*, client_t*, protocol_message_t*),
+                                      void (**on_client_connected)(protocol_listener_t*, client_t*),
+                                      void (**on_client_disconnected)(protocol_listener_t*, client_t*)) {
+    if (global_manager == NULL) {
+        return STATUS_ERROR_NOT_FOUND;
+    }
+    
+    if (listener == NULL) {
+        return STATUS_ERROR_INVALID_PARAM;
+    }
+    
+    // For now, just return NULL for all callbacks
+    // In a real implementation, we would need to store the callbacks
+    // in the protocol manager or in the listener context
+    if (on_message_received != NULL) {
+        *on_message_received = NULL;
+    }
+    
+    if (on_client_connected != NULL) {
+        *on_client_connected = NULL;
+    }
+    
+    if (on_client_disconnected != NULL) {
+        *on_client_disconnected = NULL;
+    }
+    
+    return STATUS_SUCCESS;
 }
