@@ -146,7 +146,12 @@ status_t fragmentation_send_message(protocol_listener_t* listener, client_t* cli
         fragment_message.data = message;
         fragment_message.data_len = message_size;
         
-        status_t status = listener->send_message(listener, client, &fragment_message);
+        status_t status = STATUS_SUCCESS;
+        
+        // Check if send_message function is available
+        if (listener->send_message != NULL) {
+            status = listener->send_message(listener, client, &fragment_message);
+        }
         
         free(message);
         
@@ -166,6 +171,11 @@ status_t fragmentation_process_fragment(protocol_listener_t* listener, client_t*
                                       on_message_reassembled_callback callback) {
     if (listener == NULL || client == NULL || data == NULL || data_len < sizeof(fragment_header_t) || callback == NULL) {
         return STATUS_ERROR_INVALID_PARAM;
+    }
+    
+    // Check if fragmentation system is initialized
+    if (global_manager == NULL) {
+        return STATUS_ERROR_NOT_RUNNING;
     }
     
     // Parse fragment header
@@ -278,6 +288,10 @@ status_t fragmentation_parse_header(const uint8_t* data, size_t data_len,
  * @brief Find a fragment tracker
  */
 static fragment_tracker_t* fragmentation_find_tracker(uint16_t fragment_id, client_t* client) {
+    if (global_manager == NULL) {
+        return NULL;
+    }
+    
     for (size_t i = 0; i < global_manager->tracker_count; i++) {
         fragment_tracker_t* tracker = global_manager->trackers[i];
         
@@ -434,6 +448,8 @@ static status_t fragmentation_destroy_tracker(fragment_tracker_t* tracker) {
  * @brief Cleanup thread for removing timed out trackers
  */
 static void* fragmentation_cleanup_thread(void* arg) {
+    (void)arg; // Unused parameter
+    
     while (global_manager != NULL && global_manager->running) {
         pthread_mutex_lock(&global_manager->mutex);
         

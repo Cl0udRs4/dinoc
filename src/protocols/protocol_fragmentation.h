@@ -6,11 +6,13 @@
 #ifndef DINOC_PROTOCOL_FRAGMENTATION_H
 #define DINOC_PROTOCOL_FRAGMENTATION_H
 
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <time.h>
 #include "../include/common.h"
 #include "../include/protocol.h"
 #include "../include/client.h"
-#include <time.h>
-#include <stdbool.h>
 
 /**
  * @brief Fragment header structure
