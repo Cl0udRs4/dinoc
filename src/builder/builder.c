@@ -623,7 +623,8 @@ static status_t parse_encryption(const char* encryption_str, encryption_algorith
  * @brief Print usage information
  */
 static void print_usage(const char* program_name) {
-    printf("DinoC Builder Tool v1.0.0\n");
+    printf("DinoC Builder Tool v%d.%d.%d\n", 
+           BUILDER_VERSION_MAJOR, BUILDER_VERSION_MINOR, BUILDER_VERSION_PATCH);
     printf("A tool for generating customized C2 clients\n\n");
     printf("Usage: %s [options]\n", program_name);
     printf("Options:\n");
@@ -644,6 +645,8 @@ static void print_usage(const char* program_name) {
     printf("  -v, --version=VERSION      Version number (major.minor.patch)\n");
     printf("                             Optional. Default: 1.0.0\n");
     printf("  -h, --help                 Display this help message\n");
+    printf("  -n, --no-sign              Disable binary signing\n");
+    printf("  -y, --no-verify            Disable signature verification\n");
     printf("\n");
     printf("Examples:\n");
     printf("  %s -p tcp,dns -s 127.0.0.1:8080,127.0.0.1:53 -d test.com -m shell\n", program_name);
