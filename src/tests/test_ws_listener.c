@@ -12,6 +12,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
+#include <errno.h>
+#include <arpa/inet.h>
 
 // Test configuration
 #define TEST_BIND_ADDRESS "127.0.0.1"
@@ -177,6 +179,7 @@ static void test_ws_message_send_receive(void) {
  * @brief Client thread function
  */
 static void* client_thread(void* arg) {
+    (void)arg; // Unused parameter
     // TODO: Implement WebSocket client
     // For now, we'll simulate a client connection and message
     
@@ -240,6 +243,7 @@ static void on_message_received(protocol_listener_t* listener, client_t* client,
  * @brief Client connected callback
  */
 static void on_client_connected(protocol_listener_t* listener, client_t* client) {
+    (void)listener; // Unused parameter
     printf("Client connected\n");
     test_client = client;
 }
@@ -248,6 +252,7 @@ static void on_client_connected(protocol_listener_t* listener, client_t* client)
  * @brief Client disconnected callback
  */
 static void on_client_disconnected(protocol_listener_t* listener, client_t* client) {
+    (void)listener; // Unused parameter
     printf("Client disconnected\n");
     
     if (test_client == client) {
@@ -259,6 +264,8 @@ static void on_client_disconnected(protocol_listener_t* listener, client_t* clie
  * @brief Main function
  */
 int main(int argc, char** argv) {
+    (void)argc; // Unused parameter
+    (void)argv; // Unused parameter
     // Set up signal handler
     signal(SIGINT, signal_handler);
     
