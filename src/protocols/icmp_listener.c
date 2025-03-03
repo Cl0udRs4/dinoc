@@ -104,13 +104,13 @@ static void icmp_packet_handler(u_char* user, const struct pcap_pkthdr* pkthdr, 
     client->last_seen_time = time(NULL);
     
     // Get ICMP data
-    const uint8_t* icmp_data = (uint8_t*)(packet + ip_header_len + ICMP_HEADER_SIZE);
-    size_t icmp_data_len = pkthdr->len - ip_header_len - ICMP_HEADER_SIZE;
+    uint8_t* packet_data = (uint8_t*)(packet + ip_header_len + ICMP_HEADER_SIZE);
+    size_t data_len = pkthdr->len - ip_header_len - ICMP_HEADER_SIZE;
     
     // Create message
     protocol_message_t message;
-    message.data = (uint8_t*)icmp_data;
-    message.data_len = icmp_data_len;
+    message.data = packet_data;
+    message.data_len = data_len;
     
     // Call message received callback
     if (ctx->on_message_received != NULL) {

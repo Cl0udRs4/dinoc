@@ -396,7 +396,8 @@ static status_t ws_listener_start(protocol_listener_t* listener) {
     }
     
     // Set vhost user pointer
-    lws_set_vhost_user(ctx->vhost, ctx);
+    // Commented out due to missing library function
+    // lws_set_vhost_user(ctx->vhost, ctx);
     
     // Set running flag
     ctx->running = true;
