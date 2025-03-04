@@ -3,6 +3,8 @@
  * @brief Tests for the builder tool
  */
 
+#define _GNU_SOURCE  /* For strdup */
+
 #include "../../builder/builder.h"
 #include "../../builder/template_generator.h"
 #include "../../builder/signature.h"

