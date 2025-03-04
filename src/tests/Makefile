@@ -2,7 +2,7 @@
 
 CC = gcc
 CFLAGS = -Wall -Wextra -I../include -g
-LDFLAGS = -lpthread -lcrypto -lssl -lm -lz
+LDFLAGS = -lpthread -lcrypto -lssl -lm -lz -luuid
 
 # Common objects
 COMMON_OBJS = ../common/logger.o ../common/uuid.o ../common/utils.o ../common/config.o ../client/client.o
@@ -102,7 +102,7 @@ test_protocol_switch: test_protocol_switch.c $(PROTOCOL_SWITCH_OBJ) $(PROTOCOL_O
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Module management test
-test_module_management: test_module_management.c $(MODULE_MANAGER_OBJ) $(COMMON_OBJS)
+test_module_management: test_module_management.c $(MODULE_MANAGER_OBJ) $(COMMON_OBJS) $(PROTOCOL_OBJS) $(TASK_MANAGER_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -ldl
 
 # Console test

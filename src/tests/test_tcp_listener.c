@@ -3,6 +3,8 @@
  * @brief Test program for TCP protocol listener
  */
 
+#define _GNU_SOURCE
+
 #include "../include/protocol.h"
 #include "../include/common.h"
 #include "../include/client.h"
@@ -15,6 +17,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
+#include <errno.h>
 
 // Test configuration
 #define TEST_BIND_ADDRESS "127.0.0.1"

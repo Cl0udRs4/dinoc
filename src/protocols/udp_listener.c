@@ -9,6 +9,7 @@
 #include "../include/common.h"
 #include "../include/client.h"
 #include "../common/uuid.h"
+#include "../common/logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -371,10 +372,11 @@ static void* udp_receive_thread(void* arg) {
             break;
         }
         
-        // Find or create client
-        client_t* client = udp_find_or_create_client(context, &client_addr, client_addr_len);
-        
-        if (client == NULL) {
+        // Create client
+        client_t* client = NULL;
+        status_t status = client_register(listener, NULL, &client);
+        if (status != STATUS_SUCCESS || client == NULL) {
+            LOG_ERROR("Failed to create client");
             continue;
         }
         
