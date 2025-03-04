@@ -10,6 +10,7 @@
 #include "../include/task.h"
 #include "../include/protocol.h"
 #include "../common/uuid.h"
+#include "../common/logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,6 +70,8 @@ status_t console_init(void) {
     console_register_command("config", "Configure client", "config <client_id> <key> <value>", console_cmd_config);
     console_register_command("switch", "Switch client protocol", "switch <client_id> <protocol_type>", console_cmd_switch);
     
+    LOG_INFO("Console initialized");
+    fprintf(stderr, "Console initialized\n");
     return STATUS_SUCCESS;
 }
 
@@ -90,6 +93,9 @@ status_t console_start(void) {
         pthread_mutex_unlock(&console_mutex);
         return STATUS_ERROR;
     }
+    
+    LOG_INFO("Console started");
+    fprintf(stderr, "Console started\n");
     
     pthread_mutex_unlock(&console_mutex);
     return STATUS_SUCCESS;

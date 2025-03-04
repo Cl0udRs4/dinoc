@@ -106,218 +106,195 @@ status_t server_init(const server_config_t* config) {
 status_t server_start(void) {
     pthread_mutex_lock(&server_mutex);
     
-    fprintf(stderr, "Server start called\n");
-    
-    fprintf(stderr, "Server start called\n");
-    
-    fprintf(stderr, "Server start called\n");
-    
     if (server_running) {
-        fprintf(stderr, "Server already running\n");
-        fflush(stderr);
         pthread_mutex_unlock(&server_mutex);
         return STATUS_ERROR_ALREADY_RUNNING;
     }
     
+    LOG_INFO("Starting server");
+    fprintf(stderr, "Starting server\n");
+    
+    // Protocol manager is already initialized in server_init()
+    status_t status = STATUS_SUCCESS;
+    
+    LOG_INFO("Server starting with protocol manager");
+    fprintf(stderr, "Server starting with protocol manager\n");
+    
     // Create protocol listeners
-    status_t status;
-    protocol_listener_config_t listener_config;
-    fprintf(stderr, "Starting server initialization\n");
-    fflush(stderr);
+    protocol_listener_config_t config;
+    protocol_listener_t* listener;
     
     // TCP listener
     if (server_config.enable_tcp) {
-        memset(&listener_config, 0, sizeof(listener_config));
-        listener_config.bind_address = server_config.bind_address;
-        listener_config.port = server_config.tcp_port;
+        memset(&config, 0, sizeof(config));
+        config.bind_address = server_config.bind_address;
+        config.port = server_config.tcp_port;
         
-        fprintf(stderr, "Creating TCP listener on %s:%d\n", listener_config.bind_address, listener_config.port);
-        fflush(stderr);
-        status = protocol_manager_create_listener(PROTOCOL_TYPE_TCP, &listener_config, &tcp_listener);
+        LOG_INFO("Creating TCP listener on %s:%d", config.bind_address, config.port);
+        fprintf(stderr, "Creating TCP listener on %s:%d\n", config.bind_address, config.port);
+        
+        status = protocol_manager_create_listener(PROTOCOL_TYPE_TCP, &config, &tcp_listener);
         if (status != STATUS_SUCCESS) {
-            fprintf(stderr, "Failed to create TCP listener: %d\n", status);
-            fflush(stderr);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
             return status;
         }
         
-        status = protocol_manager_register_callbacks(tcp_listener, on_message_received, on_client_connected, on_client_disconnected);
-        if (status != STATUS_SUCCESS) {
-            fprintf(stderr, "Failed to register TCP listener callbacks: %d\n", status);
-            fflush(stderr);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
-            return status;
-        }
+        LOG_INFO("TCP listener created successfully");
+        fprintf(stderr, "TCP listener created successfully\n");
         
+        // Start listener
         status = protocol_manager_start_listener(tcp_listener);
         if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to start TCP listener: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
             return status;
         }
         
-        LOG_INFO("TCP listener started on port %d", server_config.tcp_port);
+        LOG_INFO("TCP listener started successfully");
+        fprintf(stderr, "TCP listener started successfully\n");
     }
     
     // UDP listener
     if (server_config.enable_udp) {
-        memset(&listener_config, 0, sizeof(listener_config));
-        listener_config.bind_address = server_config.bind_address;
-        listener_config.port = server_config.udp_port;
+        memset(&config, 0, sizeof(config));
+        config.bind_address = server_config.bind_address;
+        config.port = server_config.udp_port;
         
-        status = protocol_manager_create_listener(PROTOCOL_TYPE_UDP, &listener_config, &udp_listener);
+        LOG_INFO("Creating UDP listener on %s:%d", config.bind_address, config.port);
+        fprintf(stderr, "Creating UDP listener on %s:%d\n", config.bind_address, config.port);
+        
+        status = protocol_manager_create_listener(PROTOCOL_TYPE_UDP, &config, &udp_listener);
         if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to create UDP listener: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
             return status;
         }
         
-        status = protocol_manager_register_callbacks(udp_listener, on_message_received, on_client_connected, on_client_disconnected);
-        if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to register UDP listener callbacks: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
-            return status;
-        }
+        LOG_INFO("UDP listener created successfully");
+        fprintf(stderr, "UDP listener created successfully\n");
         
+        // Start listener
         status = protocol_manager_start_listener(udp_listener);
         if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to start UDP listener: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
             return status;
         }
         
-        LOG_INFO("UDP listener started on port %d", server_config.udp_port);
+        LOG_INFO("UDP listener started successfully");
+        fprintf(stderr, "UDP listener started successfully\n");
     }
     
     // WebSocket listener
     if (server_config.enable_ws) {
-        memset(&listener_config, 0, sizeof(listener_config));
-        listener_config.bind_address = server_config.bind_address;
-        listener_config.port = server_config.ws_port;
-        listener_config.ws_path = "/";
+        memset(&config, 0, sizeof(config));
+        config.bind_address = server_config.bind_address;
+        config.port = server_config.ws_port;
+        config.ws_path = "/";
         
-        status = protocol_manager_create_listener(PROTOCOL_TYPE_WS, &listener_config, &ws_listener);
+        LOG_INFO("Creating WebSocket listener on %s:%d", config.bind_address, config.port);
+        fprintf(stderr, "Creating WebSocket listener on %s:%d\n", config.bind_address, config.port);
+        
+        status = protocol_manager_create_listener(PROTOCOL_TYPE_WS, &config, &ws_listener);
         if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to create WebSocket listener: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
             return status;
         }
         
-        status = protocol_manager_register_callbacks(ws_listener, on_message_received, on_client_connected, on_client_disconnected);
-        if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to register WebSocket listener callbacks: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
-            return status;
-        }
+        LOG_INFO("WebSocket listener created successfully");
+        fprintf(stderr, "WebSocket listener created successfully\n");
         
+        // Start listener
         status = protocol_manager_start_listener(ws_listener);
         if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to start WebSocket listener: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
             return status;
         }
         
-        LOG_INFO("WebSocket listener started on port %d", server_config.ws_port);
+        LOG_INFO("WebSocket listener started successfully");
+        fprintf(stderr, "WebSocket listener started successfully\n");
     }
     
     // ICMP listener
     if (server_config.enable_icmp) {
-        memset(&listener_config, 0, sizeof(listener_config));
-        listener_config.pcap_device = server_config.pcap_device;
+        memset(&config, 0, sizeof(config));
+        config.pcap_device = server_config.pcap_device;
         
-        status = protocol_manager_create_listener(PROTOCOL_TYPE_ICMP, &listener_config, &icmp_listener);
+        LOG_INFO("Creating ICMP listener on device %s", config.pcap_device);
+        fprintf(stderr, "Creating ICMP listener on device %s\n", config.pcap_device);
+        
+        status = protocol_manager_create_listener(PROTOCOL_TYPE_ICMP, &config, &icmp_listener);
         if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to create ICMP listener: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
             return status;
         }
         
-        status = protocol_manager_register_callbacks(icmp_listener, on_message_received, on_client_connected, on_client_disconnected);
-        if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to register ICMP listener callbacks: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
-            return status;
-        }
+        LOG_INFO("ICMP listener created successfully");
+        fprintf(stderr, "ICMP listener created successfully\n");
         
+        // Start listener
         status = protocol_manager_start_listener(icmp_listener);
         if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to start ICMP listener: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
             return status;
         }
         
-        LOG_INFO("ICMP listener started on device %s", server_config.pcap_device);
+        LOG_INFO("ICMP listener started successfully");
+        fprintf(stderr, "ICMP listener started successfully\n");
     }
     
     // DNS listener
     if (server_config.enable_dns) {
-        memset(&listener_config, 0, sizeof(listener_config));
-        listener_config.bind_address = server_config.bind_address;
-        listener_config.port = server_config.dns_port;
-        listener_config.domain = server_config.dns_domain;
+        memset(&config, 0, sizeof(config));
+        config.bind_address = server_config.bind_address;
+        config.port = server_config.dns_port;
+        config.domain = server_config.dns_domain;
         
-        status = protocol_manager_create_listener(PROTOCOL_TYPE_DNS, &listener_config, &dns_listener);
+        LOG_INFO("Creating DNS listener on %s:%d", config.bind_address, config.port);
+        fprintf(stderr, "Creating DNS listener on %s:%d\n", config.bind_address, config.port);
+        
+        status = protocol_manager_create_listener(PROTOCOL_TYPE_DNS, &config, &dns_listener);
         if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to create DNS listener: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
             return status;
         }
         
-        status = protocol_manager_register_callbacks(dns_listener, on_message_received, on_client_connected, on_client_disconnected);
-        if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to register DNS listener callbacks: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
-            return status;
-        }
+        LOG_INFO("DNS listener created successfully");
+        fprintf(stderr, "DNS listener created successfully\n");
         
+        // Start listener
         status = protocol_manager_start_listener(dns_listener);
         if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to start DNS listener: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
             return status;
         }
         
-        LOG_INFO("DNS listener started on port %d for domain %s", server_config.dns_port, server_config.dns_domain);
+        LOG_INFO("DNS listener started successfully");
+        fprintf(stderr, "DNS listener started successfully\n");
     }
     
-    // Start console if enabled
+    // Start HTTP API server
+    if (server_config.enable_http_api) {
+        status = http_server_start(server_config.bind_address, server_config.http_api_port);
+        if (status != STATUS_SUCCESS) {
+            LOG_ERROR("Failed to start HTTP API server");
+            fprintf(stderr, "Failed to start HTTP API server\n");
+            return status;
+        }
+        
+        LOG_INFO("HTTP API server started successfully");
+    }
+    
+    // Start console
     if (server_config.enable_console) {
+        status = console_init();
+        if (status != STATUS_SUCCESS) {
+            LOG_ERROR("Failed to initialize console");
+            fprintf(stderr, "Failed to initialize console\n");
+            return status;
+        }
+        
         status = console_start();
         if (status != STATUS_SUCCESS) {
-            LOG_ERROR("Failed to start console: %d", status);
-            server_stop();
-            pthread_mutex_unlock(&server_mutex);
+            LOG_ERROR("Failed to start console");
+            fprintf(stderr, "Failed to start console\n");
             return status;
         }
-        
-        LOG_INFO("Console interface started");
     }
     
-    // Start HTTP API if enabled
-    if (server_config.enable_http_api) {
-        // TODO: Implement HTTP API
-        LOG_INFO("HTTP API not implemented yet");
-    }
+    LOG_INFO("Server started successfully");
+    fprintf(stderr, "Server started successfully\n");
     
     server_running = true;
     pthread_mutex_unlock(&server_mutex);
     
-    LOG_INFO("Server started");
     return STATUS_SUCCESS;
 }
 

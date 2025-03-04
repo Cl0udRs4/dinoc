@@ -2,10 +2,10 @@
 
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -I../../include
-LDFLAGS = -L../../lib
-LDLIBS = -ldinoc -lssl -lcrypto
+LDFLAGS = 
+LDLIBS = -lssl -lcrypto -lrt -lpthread -luuid
 
-SRCS = test_builder.c ../../builder/builder.c ../../builder/template_generator.c ../../builder/signature.c
+SRCS = test_builder.c ../../builder/builder.c ../../builder/template_generator.c ../../builder/client_template.c ../../builder/signature.c
 OBJS = $(SRCS:.c=.o)
 TARGET = test_builder
 

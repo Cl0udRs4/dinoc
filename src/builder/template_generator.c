@@ -15,7 +15,7 @@
 #include <time.h>
 
 // Template file path
-#define TEMPLATE_FILE_PATH "src/builder/client_template.c.template"
+#define TEMPLATE_FILE_PATH "../../builder/client_template.c.template"
 
 // Builder version
 #define BUILDER_VERSION_MAJOR 1

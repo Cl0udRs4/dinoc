@@ -219,7 +219,12 @@ status_t protocol_manager_start_listener(protocol_listener_t* listener) {
         fflush(stderr);
     }
     
-    return listener->start(listener);
+    // Call start function
+    fprintf(stderr, "Calling listener start function\n");
+    fflush(stderr);
+    status_t status = listener->start(listener);
+    fprintf(stderr, "Listener start function returned: %d\n", status);
+    return status;
 }
 
 /**
